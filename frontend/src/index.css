@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    background-color: #F8F9FA;
+    color: #121224;
+    font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #121224;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Naukri.com Signature Colors & Utilities (Refined, lower-saturation corporate blue) */
+.text-naukri-title { color: #121224 !important; }
+.text-naukri-body { color: #474D6A !important; }
+.text-naukri-blue { color: #2B59C3 !important; }
+.bg-naukri-blue { background-color: #2B59C3 !important; }
+.bg-naukri-blue:hover { background-color: #22489F !important; }
+.border-naukri { border-color: #E7E7F0 !important; }
+.bg-naukri-light { background-color: #F8F9FA !important; }
+.bg-naukri-blue-soft { background-color: #F2F5FB !important; }
+
+/* Crisp scrollbars matching Naukri style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d3d8e2;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ba6ba;
+}

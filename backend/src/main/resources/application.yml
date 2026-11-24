@@ -1,0 +1,58 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: resumeintel-backend
+  
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/resumeintel_db}
+    username: ${SPRING_DATASOURCE_USERNAME:resumeintel_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:resumeintel_secure_pass_2026}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 2000ms
+
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
+
+# Security JWT Configuration
+security:
+  jwt:
+    secret: ${JWT_SECRET:9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+
+# External Python AI Microservice Bridge
+ai-service:
+  url: ${AI_SERVICE_URL:http://localhost:8000}
+  timeout-seconds: 60
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.resumeintel: DEBUG
+    org.springframework.security: INFO
