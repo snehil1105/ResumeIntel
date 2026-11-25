@@ -46,6 +46,7 @@ app.include_router(resume_router, prefix=settings.API_V1_PREFIX)
 app.include_router(export_router, prefix=settings.API_V1_PREFIX)
 app.include_router(jobs_router, prefix=settings.API_V1_PREFIX)
 
+@app.get("/", tags=["Health"])
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {
