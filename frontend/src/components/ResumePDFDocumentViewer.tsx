@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { MasterResume } from '../types';
 import { generateLatexCode, extractStyleAndColor } from '../utils/latexGenerator';
+import { downloadResumeAsPDF } from '../utils/pdfGenerator';
 
 // Helper function to extract skills by flexible category pattern without hardcoded test data
 const getCategorySkills = (skillsList: any[], pattern: RegExp): string => {
@@ -104,7 +105,7 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
   };
 
   const handlePrintOrDownloadPDF = () => {
-    window.print();
+    downloadResumeAsPDF(resume, companyName, jobTitle);
   };
 
   const pInfo: any = resume.personal_info || (resume as any).personalInfo || {};
@@ -122,11 +123,7 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
   const skills = resume.skills || [];
 
   const coursework = resume.coursework || [];
-
-  const involvements = resume.involvements || [
-    "Hackathon Participant: Built a browser-based game at VibeCode Arena, a competitive hackathon hosted on HackerEarth, within a fixed time constraint.",
-    "DSA Practice: Actively solving Data Structures and Algorithms problems on LeetCode and Codeforces."
-  ];
+  const involvements = resume.involvements || [];
 
   return (
     <div className="space-y-4">

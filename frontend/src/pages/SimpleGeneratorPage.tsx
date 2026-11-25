@@ -32,6 +32,7 @@ import { isValidCompanyName } from '../utils/companyResearch';
 import { assessDomainCompatibility, DomainAlignmentResult } from '../utils/domainAlignment';
 import { DomainMismatchView } from '../components/DomainMismatchView';
 import { ATSRealTimeReportPanel } from '../components/ATSRealTimeReportPanel';
+import { downloadResumeAsPDF } from '../utils/pdfGenerator';
 
 // Helper to extract a clean project name even if parsed with date prefixes
 function getProjectDisplayName(rawTitle: string, firstBullet?: string): string {
@@ -545,8 +546,11 @@ Minimum Qualifications:
   // Download PDF / DOCX
   const handleDownload = (format: 'PDF' | 'DOCX') => {
     const active = tailoredResume || resume;
-    const skillsList = active.skills.map(s => s.skill_name).join(', ');
-    
+    if (format === 'PDF') {
+      downloadResumeAsPDF(active, companyName, jobTitle);
+      return;
+    }
+
     const content = `${active.personal_info.full_name.toUpperCase()}
 ${active.personal_info.location || ''}
 ${active.personal_info.phone || ''} | ${active.personal_info.email} | ${active.personal_info.linkedin_url || ''} | ${active.personal_info.github_url || ''} | ${active.personal_info.portfolio_url || ''} | ${active.personal_info.leetcode_url || ''}
@@ -567,11 +571,11 @@ INVOLVEMENT
 ${(active.involvements || []).join('\n')}
 `;
 
-    const blob = new Blob([content], { type: format === 'PDF' ? 'application/pdf' : 'text/plain' });
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Resume_${active.personal_info.full_name.replace(/\s+/g, '_')}_${companyName}.${format.toLowerCase()}`;
+    a.download = `Resume_${active.personal_info.full_name.replace(/\s+/g, '_')}_${companyName}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
