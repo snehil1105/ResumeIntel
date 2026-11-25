@@ -162,38 +162,25 @@ export const SimpleGeneratorPage: React.FC<SimpleGeneratorPageProps> = ({
   const [rawTextValue, setRawTextValue] = useState("");
 
   // Job Description Input States (Synced with App State)
-  const [companyName, setCompanyName] = useState(propCompanyName || 'Google');
-  const [jobTitle, setJobTitle] = useState(propJobTitle || 'Software Engineering Intern - Backend');
-  const [jdText, setJdText] = useState(
-    propJdText ||
-`Google is looking for a Software Engineering Intern to join our Backend Infrastructure team.
-
-Minimum Qualifications:
-- Currently pursuing a Bachelor's or Master's degree in Computer Science, Computer Engineering, or related technical field.
-- Experience programming in Java, C++, Python, or Go.
-- Solid understanding of data structures, algorithms, and object-oriented software engineering.
-- Hands-on experience developing RESTful web services or relational database applications (SQL / PostgreSQL).
-
-Preferred Qualifications:
-- Familiarity with distributed systems, microservices architecture, or containerization (Docker / Kubernetes).
-- Experience writing automated unit tests (JUnit) and building clean, readable code.`
-  );
+  const [companyName, setCompanyName] = useState(propCompanyName || '');
+  const [jobTitle, setJobTitle] = useState(propJobTitle || '');
+  const [jdText, setJdText] = useState(propJdText || '');
 
   // Sync when prop values change from App or Company Intelligence Page
   useEffect(() => {
-    if (propCompanyName && propCompanyName !== companyName) {
+    if (propCompanyName !== undefined && propCompanyName !== companyName) {
       setCompanyName(propCompanyName);
     }
   }, [propCompanyName]);
 
   useEffect(() => {
-    if (propJobTitle && propJobTitle !== jobTitle) {
+    if (propJobTitle !== undefined && propJobTitle !== jobTitle) {
       setJobTitle(propJobTitle);
     }
   }, [propJobTitle]);
 
   useEffect(() => {
-    if (propJdText && propJdText !== jdText) {
+    if (propJdText !== undefined && propJdText !== jdText) {
       setJdText(propJdText);
     }
   }, [propJdText]);
