@@ -309,7 +309,7 @@ export function evaluateATSRealTime(
       {
         category: 'METRICS',
         severity: 'INFO',
-        message: 'HookRelay bullet points emphasize scalable delivery, pub-sub messaging, and cryptographic signatures.'
+        message: 'Project bullet points emphasize measurable engineering impact, technical delivery, and verified competencies.'
       },
       {
         category: 'TYPOGRAPHY',

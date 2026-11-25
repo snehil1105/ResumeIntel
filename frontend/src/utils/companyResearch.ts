@@ -177,15 +177,15 @@ export function synthesizeCompanyReport(companyName: string, jobTitle: string): 
       candidate_alignment: {
         fit_percentage: 94,
         matched_strengths: [
-          'Strong Core Java & Spring Boot backend foundations verified in Master Resume',
-          'HookRelay project directly demonstrates transactional reliability, Redis Streams pub-sub, and Dead Letter Queue error recovery',
-          'Academic CS foundation (Data Structures, DBMS, Operating Systems) from VIT Bhopal (CGPA 8.34/10)',
-          'Full-stack capabilities with React and FastAPI supporting enterprise digital initiatives'
+          'Core programming and backend architectural foundations verified from Master Resume',
+          'Practical project experience demonstrates modular API design, data persistence, and error handling',
+          'Academic computer science coursework (Data Structures, DBMS, Operating Systems)',
+          'Demonstrated engineering capabilities with modern frameworks and version control'
         ],
         gap_skills: [
-          'Review enterprise relational transaction isolation levels (ACID) and Oracle/PostgreSQL index optimization'
+          'Review enterprise relational transaction isolation levels (ACID) and database query optimization'
         ],
-        recommended_focus: 'Present HookRelay as an asynchronous decoupling solution handling peak loads with guaranteed at-least-once delivery semantics.'
+        recommended_focus: 'Present your primary technical projects emphasizing architectural trade-offs, scalability, and clean code principles.'
       },
       observed_tech_stack: [
         { name: 'Java / Spring Boot', frequency_percentage: 92, category: 'Backend', is_core_stack: true, evidence_count: 18 },
@@ -288,15 +288,15 @@ export function synthesizeCompanyReport(companyName: string, jobTitle: string): 
       candidate_alignment: {
         fit_percentage: 95,
         matched_strengths: [
-          'Core Java & Spring Boot backend architecture verified in Master Resume',
-          'HookRelay project directly matches Google distributed systems criteria (Redis Streams pub-sub, guaranteed at-least-once delivery, DLQ, HMAC SHA-256)',
-          'Academic coursework: Data Structures and Algorithms (VIT Bhopal, CGPA 8.34/10)',
-          'Active competitive programming practice directly matches online assessment demands'
+          'Core programming fundamentals and system architecture verified from Master Resume',
+          'Technical project implementations demonstrate problem-solving and modular software engineering',
+          'Foundational coursework: Data Structures, Algorithms, and Object-Oriented Design',
+          'Practical experience writing maintainable code and using version control (Git)'
         ],
         gap_skills: [
-          'Practice Google-specific graph traversal (Dijkstra, BFS/DFS) and medium-hard dynamic programming problems'
+          'Practice company-specific graph traversal (Dijkstra, BFS/DFS) and dynamic programming problems'
         ],
-        recommended_focus: 'Emphasize HookRelay\'s fault-tolerant architecture (DLQ, Redis Streams) and write unit-tested, clean modular code during coding interviews.'
+        recommended_focus: 'Emphasize clean modular architecture, optimal time/space complexity, and unit test coverage during coding interviews.'
       },
       observed_tech_stack: [
         { name: 'Java', frequency_percentage: 94, category: 'Language', is_core_stack: true, evidence_count: 18 },
@@ -399,15 +399,15 @@ export function synthesizeCompanyReport(companyName: string, jobTitle: string): 
     candidate_alignment: {
       fit_percentage: 92,
       matched_strengths: [
-        'Robust Core Java and Spring Boot foundations from academic and project experience',
-        'Proven distributed asynchronous webhook delivery project (HookRelay) with Redis Streams and Docker',
-        'Strong academic computer science grounding (Data Structures, Algorithms, DBMS, Operating Systems)',
-        'Demonstrated full-stack capabilities with React and FastAPI'
+        'Robust programming and backend fundamentals verified from candidate experience',
+        'Demonstrated practical project development with modular component structure',
+        'Academic computer science grounding (Data Structures, Algorithms, DBMS)',
+        'Demonstrated experience with modern software engineering tools and version control'
       ],
       gap_skills: [
         `Review specific cloud provider integrations and proprietary domain workflows used by ${displayName}`
       ],
-      recommended_focus: `Highlight real-world problem-solving in HookRelay (resilience, retry queues) and emphasize clean REST contract design.`
+      recommended_focus: `Highlight real-world problem-solving in your primary projects and emphasize clean REST contract design and reliability.`
     },
     observed_tech_stack: [
       { name: 'Java / Spring Boot', frequency_percentage: 88, category: 'Backend', is_core_stack: true, evidence_count: 12 },

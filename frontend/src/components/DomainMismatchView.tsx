@@ -131,12 +131,14 @@ export const DomainMismatchView: React.FC<DomainMismatchViewProps> = ({
               </div>
             </div>
 
-            <div>
-              <span className="text-slate-500 block font-medium mb-1">Signature Systems Project:</span>
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
-                <strong className="text-slate-900">HookRelay</strong> — High-throughput Webhook-as-a-Service in Java &amp; Spring Boot with Redis Streams pub-sub, HMAC SHA-256 signatures, and Dead-Letter Queue retries.
+            {alignment.candidateTopProjects && alignment.candidateTopProjects.length > 0 && (
+              <div>
+                <span className="text-slate-500 block font-medium mb-1">Featured Verified Project:</span>
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
+                  <strong className="text-slate-900">{alignment.candidateTopProjects[0]}</strong> — Verified from candidate profile.
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

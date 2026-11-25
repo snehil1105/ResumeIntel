@@ -20,22 +20,23 @@ import {
 import { MasterResume } from '../types';
 import { generateLatexCode, extractStyleAndColor } from '../utils/latexGenerator';
 
-// Helper function to extract skills by flexible category pattern with fallback
-const getCategorySkills = (skillsList: any[], pattern: RegExp, fallback: string): string => {
-  if (!skillsList || !Array.isArray(skillsList) || skillsList.length === 0) return fallback;
+// Helper function to extract skills by flexible category pattern without hardcoded test data
+const getCategorySkills = (skillsList: any[], pattern: RegExp): string => {
+  if (!skillsList || !Array.isArray(skillsList) || skillsList.length === 0) return '';
   const filtered = skillsList.filter((s: any) => {
     if (!s) return false;
     const cat = typeof s === 'string' ? '' : (s.category || '').toLowerCase();
-    return pattern.test(cat);
+    const name = typeof s === 'string' ? s : (s.skill_name || s.skillName || s.name || '');
+    return pattern.test(cat) || pattern.test(name);
   });
-  const names = (filtered.length > 0 ? filtered : [])
+  const names = filtered
     .map((s: any) => {
       if (!s) return '';
       if (typeof s === 'string') return s.trim();
       return (s.skill_name || s.skillName || s.name || '').toString().trim();
     })
     .filter(Boolean);
-  return names.length > 0 ? names.join(', ') : fallback;
+  return names.join(', ');
 };
 
 interface ResumePDFDocumentViewerProps {
@@ -459,26 +460,58 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
                   </h2>
                 </div>
                 <div className="text-[9.5pt] text-gray-900 space-y-1">
-                  <div>
-                    <span className="font-bold text-black">Programming Languages: </span>
-                    <span>{getCategorySkills(skills, /language/i, 'Python, Java, C/C++, HTML, CSS, JavaScript')}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-black">Development Tools: </span>
-                    <span>{getCategorySkills(skills, /tool|cloud|dev tool/i, 'VS Code, IntelliJ IDEA, Jupyter Notebook, Google Colab, Git, Linux')}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-black">Technologies and Frameworks: </span>
-                    <span>{getCategorySkills(skills, /framework|technology|technologies/i, 'Spring Boot, React.js, REST APIs, Redis, Docker, LangChain, OpenAI Agents SDK, OpenAI Responses API, Oracle AI Vector Search, Oracle AI Vector Search Flow')}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-black">Machine Learning &amp; AI: </span>
-                    <span>{getCategorySkills(skills, /machine learning|ml|ai/i, 'NumPy, Pandas, Matplotlib, Seaborn')}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-black">Databases: </span>
-                    <span>{getCategorySkills(skills, /database/i, 'MySQL, PostgreSQL, MongoDB, Redis')}</span>
-                  </div>
+                  {(() => {
+                    const langs = getCategorySkills(skills, /language|lang/i);
+                    const tools = getCategorySkills(skills, /tool|cloud|dev tool/i);
+                    const frameworks = getCategorySkills(skills, /framework|technology|technologies|backend|frontend/i);
+                    const ml = getCategorySkills(skills, /machine learning|ml|ai/i);
+                    const dbs = getCategorySkills(skills, /database|db/i);
+                    const hasCategorized = langs || tools || frameworks || ml || dbs;
+
+                    if (!hasCategorized && skills && skills.length > 0) {
+                      return (
+                        <div>
+                          <span className="font-bold text-black">Skills: </span>
+                          <span>{skills.map((s: any) => s.skill_name || s.name || s).join(', ')}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {langs && (
+                          <div>
+                            <span className="font-bold text-black">Programming Languages: </span>
+                            <span>{langs}</span>
+                          </div>
+                        )}
+                        {tools && (
+                          <div>
+                            <span className="font-bold text-black">Development Tools: </span>
+                            <span>{tools}</span>
+                          </div>
+                        )}
+                        {frameworks && (
+                          <div>
+                            <span className="font-bold text-black">Technologies and Frameworks: </span>
+                            <span>{frameworks}</span>
+                          </div>
+                        )}
+                        {ml && (
+                          <div>
+                            <span className="font-bold text-black">Machine Learning &amp; AI: </span>
+                            <span>{ml}</span>
+                          </div>
+                        )}
+                        {dbs && (
+                          <div>
+                            <span className="font-bold text-black">Databases: </span>
+                            <span>{dbs}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}

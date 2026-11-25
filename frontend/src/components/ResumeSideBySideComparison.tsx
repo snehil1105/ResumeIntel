@@ -15,22 +15,23 @@ import {
 } from 'lucide-react';
 import { MasterResume } from '../types';
 
-// Helper function to extract skills by flexible category pattern with fallback
-const getCategorySkills = (skillsList: any[], pattern: RegExp, fallback: string): string => {
-  if (!skillsList || !Array.isArray(skillsList) || skillsList.length === 0) return fallback;
+// Helper function to extract skills by flexible category pattern without hardcoded test data
+const getCategorySkills = (skillsList: any[], pattern: RegExp): string => {
+  if (!skillsList || !Array.isArray(skillsList) || skillsList.length === 0) return '';
   const filtered = skillsList.filter((s: any) => {
     if (!s) return false;
     const cat = typeof s === 'string' ? '' : (s.category || '').toLowerCase();
-    return pattern.test(cat);
+    const name = typeof s === 'string' ? s : (s.skill_name || s.skillName || s.name || '');
+    return pattern.test(cat) || pattern.test(name);
   });
-  const names = (filtered.length > 0 ? filtered : [])
+  const names = filtered
     .map((s: any) => {
       if (!s) return '';
       if (typeof s === 'string') return s.trim();
       return (s.skill_name || s.skillName || s.name || '').toString().trim();
     })
     .filter(Boolean);
-  return names.length > 0 ? names.join(', ') : fallback;
+  return names.join(', ');
 };
 
 interface ResumeSideBySideComparisonProps {
@@ -201,26 +202,58 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 <span className="text-[8pt] text-gray-500 font-sans italic">Baseline Order</span>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-1">
-                <div>
-                  <span className="font-bold text-black">Programming Languages: </span>
-                  <span>{getCategorySkills(masterResume.skills, /language/i, 'Python, Java, C/C++, HTML, CSS, JavaScript')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Development Tools: </span>
-                  <span>{getCategorySkills(masterResume.skills, /tool|cloud|dev tool/i, 'VS Code, IntelliJ IDEA, Jupyter Notebook, Google Colab, Git, Linux')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Technologies and Frameworks: </span>
-                  <span>{getCategorySkills(masterResume.skills, /framework|technology|technologies/i, 'Spring Boot, React.js, REST APIs, Redis, Docker, LangChain, OpenAI Agents SDK, OpenAI Responses API, Oracle AI Vector Search, Oracle AI Vector Search Flow')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Machine Learning &amp; AI: </span>
-                  <span>{getCategorySkills(masterResume.skills, /machine learning|ml|ai/i, 'NumPy, Pandas, Matplotlib, Seaborn')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Databases: </span>
-                  <span>{getCategorySkills(masterResume.skills, /database/i, 'MySQL, PostgreSQL, MongoDB, Redis')}</span>
-                </div>
+                {(() => {
+                  const langs = getCategorySkills(masterResume.skills, /language|lang/i);
+                  const tools = getCategorySkills(masterResume.skills, /tool|cloud|dev tool/i);
+                  const frameworks = getCategorySkills(masterResume.skills, /framework|technology|technologies|backend|frontend/i);
+                  const ml = getCategorySkills(masterResume.skills, /machine learning|ml|ai/i);
+                  const dbs = getCategorySkills(masterResume.skills, /database|db/i);
+                  const hasCategorized = langs || tools || frameworks || ml || dbs;
+
+                  if (!hasCategorized && masterResume.skills && masterResume.skills.length > 0) {
+                    return (
+                      <div>
+                        <span className="font-bold text-black">Skills: </span>
+                        <span>{masterResume.skills.map((s: any) => s.skill_name || s.name || s).join(', ')}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {langs && (
+                        <div>
+                          <span className="font-bold text-black">Programming Languages: </span>
+                          <span>{langs}</span>
+                        </div>
+                      )}
+                      {tools && (
+                        <div>
+                          <span className="font-bold text-black">Development Tools: </span>
+                          <span>{tools}</span>
+                        </div>
+                      )}
+                      {frameworks && (
+                        <div>
+                          <span className="font-bold text-black">Technologies and Frameworks: </span>
+                          <span>{frameworks}</span>
+                        </div>
+                      )}
+                      {ml && (
+                        <div>
+                          <span className="font-bold text-black">Machine Learning &amp; AI: </span>
+                          <span>{ml}</span>
+                        </div>
+                      )}
+                      {dbs && (
+                        <div>
+                          <span className="font-bold text-black">Databases: </span>
+                          <span>{dbs}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -389,7 +422,7 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 </span>
               </div>
               {tailoredResume.projects.map((proj, idx) => {
-                const isTailoredProject = proj.title === 'HookRelay';
+                const isTailoredProject = idx === 0 || (proj as any).is_tailored === true;
                 const repo = proj.repo_url;
                 return (
                   <div 
@@ -456,28 +489,58 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 </span>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-1 p-2 rounded bg-emerald-50/40 border border-emerald-100">
-                <div>
-                  <span className="font-bold text-black">Programming Languages: </span>
-                  <span>{getCategorySkills(tailoredResume.skills, /language/i, 'Python, Java, C/C++, HTML, CSS, JavaScript')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Technologies and Frameworks: </span>
-                  <span className="font-medium text-black">
-                    {getCategorySkills(tailoredResume.skills, /framework|technology|technologies/i, 'Spring Boot, React.js, REST APIs, Redis, Docker, LangChain, OpenAI Agents SDK, OpenAI Responses API, Oracle AI Vector Search, Oracle AI Vector Search Flow')}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Development Tools: </span>
-                  <span>{getCategorySkills(tailoredResume.skills, /tool|cloud|dev tool/i, 'VS Code, IntelliJ IDEA, Jupyter Notebook, Google Colab, Git, Linux')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Machine Learning &amp; AI: </span>
-                  <span>{getCategorySkills(tailoredResume.skills, /machine learning|ml|ai/i, 'NumPy, Pandas, Matplotlib, Seaborn')}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-black">Databases: </span>
-                  <span>{getCategorySkills(tailoredResume.skills, /database/i, 'MySQL, PostgreSQL, MongoDB, Redis')}</span>
-                </div>
+                {(() => {
+                  const langs = getCategorySkills(tailoredResume.skills, /language|lang/i);
+                  const frameworks = getCategorySkills(tailoredResume.skills, /framework|technology|technologies|backend|frontend/i);
+                  const tools = getCategorySkills(tailoredResume.skills, /tool|cloud|dev tool/i);
+                  const ml = getCategorySkills(tailoredResume.skills, /machine learning|ml|ai/i);
+                  const dbs = getCategorySkills(tailoredResume.skills, /database|db/i);
+                  const hasCategorized = langs || frameworks || tools || ml || dbs;
+
+                  if (!hasCategorized && tailoredResume.skills && tailoredResume.skills.length > 0) {
+                    return (
+                      <div>
+                        <span className="font-bold text-black">Skills: </span>
+                        <span>{tailoredResume.skills.map((s: any) => s.skill_name || s.name || s).join(', ')}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {langs && (
+                        <div>
+                          <span className="font-bold text-black">Programming Languages: </span>
+                          <span>{langs}</span>
+                        </div>
+                      )}
+                      {frameworks && (
+                        <div>
+                          <span className="font-bold text-black">Technologies and Frameworks: </span>
+                          <span className="font-medium text-black">{frameworks}</span>
+                        </div>
+                      )}
+                      {tools && (
+                        <div>
+                          <span className="font-bold text-black">Development Tools: </span>
+                          <span>{tools}</span>
+                        </div>
+                      )}
+                      {ml && (
+                        <div>
+                          <span className="font-bold text-black">Machine Learning &amp; AI: </span>
+                          <span>{ml}</span>
+                        </div>
+                      )}
+                      {dbs && (
+                        <div>
+                          <span className="font-bold text-black">Databases: </span>
+                          <span>{dbs}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
