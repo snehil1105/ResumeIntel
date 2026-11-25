@@ -19,7 +19,8 @@ import {
   GraduationCap,
   Code2,
   AlertOctagon,
-  ShieldAlert
+  ShieldAlert,
+  FileCode
 } from 'lucide-react';
 import { extractAndParseResumeFile, extractTextFromFile, parseRawResumeToStructured } from '../utils/fileParser';
 import { MasterResume } from '../types';
@@ -33,6 +34,7 @@ import { assessDomainCompatibility, DomainAlignmentResult } from '../utils/domai
 import { DomainMismatchView } from '../components/DomainMismatchView';
 import { ATSRealTimeReportPanel } from '../components/ATSRealTimeReportPanel';
 import { downloadResumeAsPDF } from '../utils/pdfGenerator';
+import { generateLatexCode } from '../utils/latexGenerator';
 
 // Helper to extract a clean project name even if parsed with date prefixes
 function getProjectDisplayName(rawTitle: string, firstBullet?: string): string {
@@ -509,7 +511,7 @@ Minimum Qualifications:
 
             return {
               ...proj,
-              title: cleanTitle && cleanTitle !== proj.title && !/^\w+\s+\d{4}/i.test(cleanTitle) ? cleanTitle : proj.title,
+              title: proj.title,
               bullet_points: [
                 enhancedFirst,
                 ...proj.bullet_points.slice(1)
@@ -520,6 +522,10 @@ Minimum Qualifications:
           return proj;
         });
       }
+
+      // Preserve authentic coursework & involvements
+      tailored.coursework = (resume.coursework && resume.coursework.length > 0) ? resume.coursework : (resume.certifications || []);
+      tailored.involvements = (resume.involvements && resume.involvements.length > 0) ? resume.involvements : (resume.achievements || []);
 
       try {
         const changes = generateDetailedChanges(resume, tailored, companyName, jobTitle, jdText);
@@ -541,6 +547,35 @@ Minimum Qualifications:
     } finally {
       setIsRunning(false);
     }
+  };
+
+  // Download Original LaTeX (.tex)
+  const handleDownloadOriginalLatex = () => {
+    const active = resume;
+    const result = generateLatexCode(active, '000000');
+    const blob = new Blob([result.latexCode], { type: 'text/x-tex;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const candidateName = (active.personal_info?.full_name || 'Resume').replace(/\s+/g, '_');
+    a.download = `Resume_${candidateName}_Original.tex`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Download Tailored LaTeX (.tex)
+  const handleDownloadTailoredLatex = () => {
+    const active = tailoredResume || resume;
+    const result = generateLatexCode(active, '000000');
+    const blob = new Blob([result.latexCode], { type: 'text/x-tex;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const candidateName = (active.personal_info?.full_name || 'Resume').replace(/\s+/g, '_');
+    const targetComp = (companyName || 'Target').replace(/\s+/g, '_');
+    a.download = `Resume_${candidateName}_${targetComp}_Tailored.tex`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Download PDF / DOCX
@@ -861,6 +896,23 @@ ${(active.involvements || []).join('\n')}
                   )}
                 </div>
 
+                {/* Download Original LaTeX Button right on the uploaded profile card */}
+                {resume.personal_info?.full_name && (
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {(resume.projects || []).length} Projects · {(resume.educations || []).length} Education · {(resume.coursework || []).length} Coursework
+                    </span>
+                    <button
+                      onClick={handleDownloadOriginalLatex}
+                      className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 text-[11px] font-semibold text-slate-700 border border-slate-300 flex items-center gap-1.5 shadow-sm transition-colors"
+                      title="Download the exact compilable LaTeX (.tex) of your uploaded resume"
+                    >
+                      <FileCode className="w-3.5 h-3.5 text-blue-600" />
+                      Original LaTeX (.tex)
+                    </button>
+                  </div>
+                )}
+
                 {/* Collapsible Direct Text Input */}
                 {showRawTextEditor && (
                   <div className="pt-2 border-t border-slate-200 space-y-2">
@@ -1055,13 +1107,32 @@ ${(active.involvements || []).join('\n')}
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleDownloadOriginalLatex}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Download 100% bug-free LaTeX code of your original master resume"
+              >
+                <FileCode className="w-3.5 h-3.5 text-slate-600" />
+                Original LaTeX (.tex)
+              </button>
+
+              <button
+                onClick={handleDownloadTailoredLatex}
+                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Download 100% bug-free LaTeX code tailored for this job"
+              >
+                <FileCode className="w-3.5 h-3.5 text-blue-600" />
+                Tailored LaTeX (.tex)
+              </button>
+
               <button
                 onClick={() => handleDownload('PDF')}
-                className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Download genuine binary PDF with active clickable links"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" />
-                Quick Export
+                <Download className="w-3.5 h-3.5" />
+                Download PDF
               </button>
             </div>
           </div>

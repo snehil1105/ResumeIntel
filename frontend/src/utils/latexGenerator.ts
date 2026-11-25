@@ -169,13 +169,14 @@ ${skillLines.join('\n')}
  \\end{itemize}
 ` : '';
 
-  // 4. COURSEWORK (FOURTH)
-  const coursework = resume.coursework || (resume.certifications && resume.certifications.length > 0 ? resume.certifications : [
-    "Cloud Computing: IIT Kharagpur / NPTEL",
+  // 4. COURSEWORK & CERTIFICATIONS (FOURTH)
+  const coursework = (resume.coursework && resume.coursework.length > 0) ? resume.coursework : (resume.certifications && resume.certifications.length > 0 ? resume.certifications : [
+    "Internet of Things (IoT): IIT Kharagpur / NPTEL",
     "Agentic AI Certified Foundations Associate: Oracle University",
-    "Marketing Analysis: IIT Kharagpur / NPTEL",
     "IBM AI Engineering Professional Certificate: Coursera",
-    "Academic Coursework: Data Structures and Algorithms, Object Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
+    "Cloud Computing: IIT Kharagpur / NPTEL",
+    "Marketing Analysis: IIT Kharagpur / NPTEL",
+    "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
   ]);
 
   const courseworkLines = coursework.map(cw => {
@@ -186,8 +187,8 @@ ${skillLines.join('\n')}
     return `     ${escapeLatex(cw)} \\\\`;
   });
 
-  const courseworkSection = courseworkLines.length > 0 ? `%----------- COURSEWORK -----------
-\\section{Coursework}
+  const courseworkSection = courseworkLines.length > 0 ? `%----------- COURSEWORK & CERTIFICATIONS -----------
+\\section{Coursework \\& Certifications}
  \\begin{itemize}[leftmargin=0.15in, label={}]
     \\small{\\item{
 ${courseworkLines.join('\n')}
@@ -196,9 +197,9 @@ ${courseworkLines.join('\n')}
 ` : '';
 
   // 5. INVOLVEMENT (FIFTH)
-  const involvements = resume.involvements || (resume.achievements && resume.achievements.length > 0 ? resume.achievements : [
-    "Hackathon Participant: Built a browser-based game at VibeCode Arena, a competitive hackathon hosted on HackerEarth, within a fixed time constraint.",
-    "DSA Practice: Actively solving Data Structures and Algorithms problems on LeetCode and Codeforces."
+  const involvements = (resume.involvements && resume.involvements.length > 0) ? resume.involvements : (resume.achievements && resume.achievements.length > 0 ? resume.achievements : [
+    "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
+    "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
   ]);
 
   const involvementLines = involvements.map(inv => {

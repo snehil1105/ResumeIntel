@@ -257,15 +257,22 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
               </div>
             </div>
 
-            {/* 4. Coursework (Fourth) */}
+            {/* 4. Coursework & Certifications (Fourth) */}
             <div className="space-y-1">
               <div className="border-b-[1.2px] border-black pb-0.5 mb-1.5">
                 <h2 className="text-[11pt] font-bold uppercase tracking-wide font-serif text-black">
-                  Coursework
+                  Coursework &amp; Certifications
                 </h2>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {(masterResume.coursework || []).map((cw, idx) => (
+                {((masterResume.coursework && masterResume.coursework.length > 0) ? masterResume.coursework : (masterResume.certifications && masterResume.certifications.length > 0 ? masterResume.certifications : [
+                  "Internet of Things (IoT): IIT Kharagpur / NPTEL",
+                  "Agentic AI Certified Foundations Associate: Oracle University",
+                  "IBM AI Engineering Professional Certificate: Coursera",
+                  "Cloud Computing: IIT Kharagpur / NPTEL",
+                  "Marketing Analysis: IIT Kharagpur / NPTEL",
+                  "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
+                ])).map((cw, idx) => (
                   <div key={idx}>{cw}</div>
                 ))}
               </div>
@@ -279,7 +286,10 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 </h2>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {(masterResume.involvements || []).map((inv, idx) => (
+                {((masterResume.involvements && masterResume.involvements.length > 0) ? masterResume.involvements : (masterResume.achievements && masterResume.achievements.length > 0 ? masterResume.achievements : [
+                  "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
+                  "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
+                ])).map((inv, idx) => (
                   <div key={idx}>{inv}</div>
                 ))}
               </div>
@@ -544,7 +554,7 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
               </div>
             </div>
 
-            {/* 4. Coursework (Fourth) */}
+            {/* 4. Coursework & Certifications (Fourth) */}
             <div className="space-y-1">
               <div 
                 style={{ borderBottomColor: accentColor }}
@@ -554,12 +564,19 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                   style={{ color: accentColor }}
                   className="text-[11pt] font-bold uppercase tracking-wide font-serif"
                 >
-                  Coursework
+                  Coursework &amp; Certifications
                 </h2>
                 <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {(tailoredResume.coursework || []).map((cw, idx) => (
+                {((tailoredResume.coursework && tailoredResume.coursework.length > 0) ? tailoredResume.coursework : (tailoredResume.certifications && tailoredResume.certifications.length > 0 ? tailoredResume.certifications : [
+                  "Internet of Things (IoT): IIT Kharagpur / NPTEL",
+                  "Agentic AI Certified Foundations Associate: Oracle University",
+                  "IBM AI Engineering Professional Certificate: Coursera",
+                  "Cloud Computing: IIT Kharagpur / NPTEL",
+                  "Marketing Analysis: IIT Kharagpur / NPTEL",
+                  "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
+                ])).map((cw, idx) => (
                   <div key={idx}>{cw}</div>
                 ))}
               </div>
@@ -580,7 +597,10 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
               </div>
               <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {(tailoredResume.involvements || []).map((inv, idx) => (
+                {((tailoredResume.involvements && tailoredResume.involvements.length > 0) ? tailoredResume.involvements : (tailoredResume.achievements && tailoredResume.achievements.length > 0 ? tailoredResume.achievements : [
+                  "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
+                  "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
+                ])).map((inv, idx) => (
                   <div key={idx}>{inv}</div>
                 ))}
               </div>

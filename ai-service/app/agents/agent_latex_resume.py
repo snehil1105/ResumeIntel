@@ -191,14 +191,15 @@ class LaTeXResumeAgent:
  \\end{{itemize}}
 """
 
-        # 4. COURSEWORK (FOURTH)
-        coursework = getattr(resume, 'coursework', None) or [
-            "Cloud Computing: IIT Kharagpur / NPTEL",
+        # 4. COURSEWORK & CERTIFICATIONS (FOURTH)
+        coursework = getattr(resume, 'coursework', None) or (resume.certifications if resume.certifications else [
+            "Internet of Things (IoT): IIT Kharagpur / NPTEL",
             "Agentic AI Certified Foundations Associate: Oracle University",
-            "Marketing Analysis: IIT Kharagpur / NPTEL",
             "IBM AI Engineering Professional Certificate: Coursera",
-            "Academic Coursework: Data Structures and Algorithms, Object Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-        ]
+            "Cloud Computing: IIT Kharagpur / NPTEL",
+            "Marketing Analysis: IIT Kharagpur / NPTEL",
+            "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
+        ])
         cw_lines = []
         for cw in coursework:
             parts = cw.split(':')
@@ -207,8 +208,8 @@ class LaTeXResumeAgent:
             else:
                 cw_lines.append(f"     {self.escape_latex(cw)} \\\\")
 
-        coursework_section = f"""%----------- COURSEWORK -----------
-\\section{{Coursework}}
+        coursework_section = f"""%----------- COURSEWORK & CERTIFICATIONS -----------
+\\section{{Coursework \\& Certifications}}
  \\begin{{itemize}}[leftmargin=0.15in, label={{}}]
     \\small{{\\item{{
 {chr(10).join(cw_lines)}
@@ -217,10 +218,10 @@ class LaTeXResumeAgent:
 """
 
         # 5. INVOLVEMENT (FIFTH)
-        involvements = getattr(resume, 'involvements', None) or [
-            "Hackathon Participant: Built a browser-based game at VibeCode Arena, a competitive hackathon hosted on HackerEarth, within a fixed time constraint.",
-            "DSA Practice: Actively solving Data Structures and Algorithms problems on LeetCode and Codeforces."
-        ]
+        involvements = getattr(resume, 'involvements', None) or (resume.achievements if resume.achievements else [
+            "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
+            "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
+        ])
         inv_lines = []
         for inv in involvements:
             parts = inv.split(':')

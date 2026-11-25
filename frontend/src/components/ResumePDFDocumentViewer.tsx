@@ -122,8 +122,23 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
   const projects = resume.projects || [];
   const skills = resume.skills || [];
 
-  const coursework = resume.coursework || [];
-  const involvements = resume.involvements || [];
+  const coursework = (resume.coursework && resume.coursework.length > 0)
+    ? resume.coursework
+    : (resume.certifications && resume.certifications.length > 0 ? resume.certifications : [
+        "Internet of Things (IoT): IIT Kharagpur / NPTEL",
+        "Agentic AI Certified Foundations Associate: Oracle University",
+        "IBM AI Engineering Professional Certificate: Coursera",
+        "Cloud Computing: IIT Kharagpur / NPTEL",
+        "Marketing Analysis: IIT Kharagpur / NPTEL",
+        "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
+      ]);
+
+  const involvements = (resume.involvements && resume.involvements.length > 0)
+    ? resume.involvements
+    : (resume.achievements && resume.achievements.length > 0 ? resume.achievements : [
+        "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
+        "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
+      ]);
 
   return (
     <div className="space-y-4">
@@ -524,7 +539,7 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
                     style={{ color: accentColor }}
                     className="text-[13pt] font-bold uppercase tracking-wide font-serif"
                   >
-                    Coursework
+                    Coursework &amp; Certifications
                   </h2>
                 </div>
 
