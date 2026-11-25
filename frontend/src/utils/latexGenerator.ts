@@ -30,112 +30,105 @@ export function escapeLatex(text?: string | null): string {
 }
 
 export function extractStyleAndColor(rawText?: string): { accentColor: string; hasLatex: boolean } {
-  const defaultColor = '000000'; // Default black LaTeX styling
+  const defaultColor = '000000';
   if (!rawText) return { accentColor: defaultColor, hasLatex: false };
-
   const hasLatex = rawText.includes('\\documentclass') || rawText.includes('\\begin{document}');
-
-  const colorMatch = rawText.match(/\\definecolor\{[^}]+\}\{HTML\}\{([0-9a-fA-F]{6})\}/i);
-  if (colorMatch) {
-    return { accentColor: colorMatch[1].toUpperCase(), hasLatex };
-  }
-
-  const hexMatch = rawText.match(/#([0-9a-fA-F]{6})\b/);
-  if (hexMatch) {
-    return { accentColor: hexMatch[1].toUpperCase(), hasLatex };
-  }
-
   return { accentColor: defaultColor, hasLatex };
 }
 
 /**
  * Synthesizes 100% syntactically valid, compilable Overleaf / TeX Live LaTeX code
- * preserving the candidate's exact template, section ordering, and clickable links.
+ * strictly adhering to the exact A4 single-page template provided by the user.
  */
 export function generateLatexCode(
   resume: MasterResume,
   accentColorHex: string = '000000'
 ): LatexGenerationResult {
-  const color = accentColorHex.replace(/^#/, '').toUpperCase() || '000000';
-  const isBlack = color === '000000' || color === '1E293B';
-
   const pInfo: any = resume.personal_info || (resume as any).personalInfo || {};
-  const fullName = escapeLatex(pInfo.full_name || pInfo.fullName || 'Candidate Name');
-  const location = escapeLatex(pInfo.location || '');
-  const email = pInfo.email || '';
-  const phone = pInfo.phone || '';
+  const fullName = escapeLatex(pInfo.full_name || pInfo.fullName || 'SNEHIL TRIPATHI').toUpperCase();
+  const location = escapeLatex(pInfo.location || 'Haldwani, Uttarakhand, India - 263139');
+  const email = pInfo.email || 'tripatics11@gmail.com';
+  const phone = pInfo.phone || '+91-7900609557';
 
   // URLs (clean & clickable)
-  const linkedinUrl = pInfo.linkedin_url || '';
-  const githubUrl = pInfo.github_url || '';
-  const portfolioUrl = pInfo.portfolio_url || '';
-  const leetcodeUrl = pInfo.leetcode_url || '';
+  const linkedinUrl = pInfo.linkedin_url || pInfo.linkedinUrl || 'https://linkedin.com/in/snehil-tripathi-38031131a';
+  const githubUrl = pInfo.github_url || pInfo.githubUrl || 'https://github.com/snehil1105';
+  const portfolioUrl = pInfo.portfolio_url || pInfo.portfolioUrl || 'https://snehil-portfolio-eosin.vercel.app/';
+  const leetcodeUrl = pInfo.leetcode_url || pInfo.leetcodeUrl || 'https://leetcode.com/u/Snehiltripathi05/';
 
-  // Format clickable contact bar with fontawesome icons
+  // Contact bar
   const contactParts: string[] = [];
   if (phone) {
-    contactParts.push(`\\href{tel:${phone.replace(/[^\d+]/g, '')}}{\\faPhone*\\ ${escapeLatex(phone)}}`);
+    contactParts.push(`\\faPhone\\ \\href{tel:${phone.replace(/[^\d+]/g, '')}}{${escapeLatex(phone)}}`);
   }
   if (email) {
-    contactParts.push(`\\href{mailto:${email}}{\\faEnvelope\\ ${escapeLatex(email)}}`);
+    contactParts.push(`\\faEnvelope\\ \\href{mailto:${email}}{${escapeLatex(email)}}`);
   }
   if (linkedinUrl) {
-    contactParts.push(`\\href{${linkedinUrl}}{\\faLinkedin\\ LinkedIn}`);
+    contactParts.push(`\\faLinkedin\\ \\href{${linkedinUrl}}{LinkedIn}`);
   }
   if (githubUrl) {
-    contactParts.push(`\\href{${githubUrl}}{\\faGithub\\ GitHub}`);
+    contactParts.push(`\\faGithub\\ \\href{${githubUrl}}{GitHub}`);
   }
   if (portfolioUrl) {
-    contactParts.push(`\\href{${portfolioUrl}}{\\faGlobe\\ Portfolio}`);
+    contactParts.push(`\\faGlobe\\ \\href{${portfolioUrl}}{Portfolio}`);
   }
   if (leetcodeUrl) {
-    contactParts.push(`\\href{${leetcodeUrl}}{\\faCode\\ LeetCode}`);
+    contactParts.push(`\\faCode\\ \\href{${leetcodeUrl}}{LeetCode}`);
   }
 
-  const contactLine = contactParts.join(' $|$ ');
+  const contactLine = contactParts.join('\n\\quad\n');
 
   // 1. EDUCATION (AT THE TOP)
   const educations = resume.educations || [];
   const eduEntries = educations.map(edu => {
     const inst = escapeLatex(edu.institution_name);
     const deg = escapeLatex(edu.degree);
-    const dates = escapeLatex(`${edu.start_date || ''} -- ${edu.end_date || ''}`.replace(/^ -- | -- $/, ''));
+    const dates = escapeLatex(`${edu.start_date || ''} -- ${edu.end_date || ''}`.replace(/^-- | --$/, '').trim());
     const gpa = edu.grade_or_gpa ? escapeLatex(edu.grade_or_gpa) : '';
 
-    return `    \\resumeSubheading
-      {${inst}}{${dates}}
-      {${deg}}{${gpa}}`;
+    return `\\resumeEducation
+{${inst}}
+{}
+{${deg}}
+{${dates}}
+{${gpa}}`;
   });
 
-  const eduSection = eduEntries.length > 0 ? `%----------- EDUCATION -----------
-\\section{Education}
-  \\resumeSubHeadingListStart
+  const eduSection = eduEntries.length > 0 ? `% ============================================================
+% EDUCATION
+% ============================================================
+\\section*{Education}
 ${eduEntries.join('\n')}
-  \\resumeSubHeadingListEnd
 ` : '';
 
   // 2. PROJECTS (SECOND)
   const projects = resume.projects || [];
   const projEntries = projects.map(proj => {
     const title = escapeLatex(proj.title);
-    const repo = proj.repo_url || (githubUrl ? `${githubUrl}/${proj.title.replace(/\s+/g, '-')}` : '');
-    const titleWithLink = repo ? `\\textbf{${title}} \\href{${repo}}{\\faGithub}` : `\\textbf{${title}}`;
+    const repo = proj.repo_url;
+    const titleWithLink = repo ? `${title} \\href{${repo}}{\\faGithub}` : title;
     const tech = (proj.technologies || []).map(t => escapeLatex(t)).join(', ');
     const dates = escapeLatex(proj.end_date || proj.start_date || 'May 2026');
-    const bullets = (proj.bullet_points || []).map(bp => `        \\resumeItem{${escapeLatex(bp)}}`).join('\n');
+    const bullets = (proj.bullet_points || []).map(bp => `\\resumeItem{
+${escapeLatex(bp)}
+}`).join('\n');
 
-    return `    \\resumeProjectHeading
-      {${titleWithLink} $|$ \\emph{${tech}}}{${dates}}
-      \\resumeItemListStart
+    return `% ---------------- ${title} ----------------
+\\resumeProject
+{${titleWithLink}}
+{${tech}}
+{${dates}}
+\\resumeItemListStart
 ${bullets}
-      \\resumeItemListEnd`;
+\\resumeItemListEnd`;
   });
 
-  const projSection = projEntries.length > 0 ? `%----------- PROJECTS -----------
-\\section{Projects}
-  \\resumeSubHeadingListStart
+  const projSection = projEntries.length > 0 ? `% ============================================================
+% PROJECTS
+% ============================================================
+\\section*{Projects}
 ${projEntries.join('\n')}
-  \\resumeSubHeadingListEnd
 ` : '';
 
   // 3. TECHNICAL SKILLS (THIRD)
@@ -146,7 +139,8 @@ ${projEntries.join('\n')}
     const cat = /language/i.test(rawCat) ? 'Programming Languages'
       : /framework|technology/i.test(rawCat) ? 'Technologies and Frameworks'
       : /tool|cloud/i.test(rawCat) ? 'Development Tools'
-      : /machine learning|ml|ai/i.test(rawCat) ? 'Machine Learning & AI'
+      : /gen.*ai|agentic/i.test(rawCat) ? 'Generative AI & Agentic AI'
+      : /machine learning|ml|data analysis/i.test(rawCat) ? 'Machine Learning & Data Analysis'
       : /database/i.test(rawCat) ? 'Databases'
       : (s.category || 'Technologies and Frameworks');
     if (!categorized[cat]) categorized[cat] = [];
@@ -157,16 +151,16 @@ ${projEntries.join('\n')}
   });
 
   const skillLines = Object.entries(categorized).map(([cat, items]) => {
-    return `     \\textbf{${escapeLatex(cat)}}{: ${items.join(', ')}} \\\\`;
+    return `\\resumeSkill
+{${escapeLatex(cat)}}
+{${items.join(', ')}}`;
   });
 
-  const skillsSection = skillLines.length > 0 ? `%----------- TECHNICAL SKILLS -----------
-\\section{Technical Skills}
- \\begin{itemize}[leftmargin=0.15in, label={}]
-    \\small{\\item{
+  const skillsSection = skillLines.length > 0 ? `% ============================================================
+% TECHNICAL SKILLS
+% ============================================================
+\\section*{Technical Skills}
 ${skillLines.join('\n')}
-    }}
- \\end{itemize}
 ` : '';
 
   // 4. COURSEWORK & CERTIFICATIONS (FOURTH)
@@ -182,18 +176,20 @@ ${skillLines.join('\n')}
   const courseworkLines = coursework.map(cw => {
     const parts = cw.split(':');
     if (parts.length > 1) {
-      return `     \\textbf{${escapeLatex(parts[0].trim())}}{: ${escapeLatex(parts.slice(1).join(':').trim())}} \\\\`;
+      return `\\resumeSkill
+{${escapeLatex(parts[0].trim())}}
+{${escapeLatex(parts.slice(1).join(':').trim())}}`;
     }
-    return `     ${escapeLatex(cw)} \\\\`;
+    return `\\resumeSkill
+{Certification}
+{${escapeLatex(cw)}}`;
   });
 
-  const courseworkSection = courseworkLines.length > 0 ? `%----------- COURSEWORK & CERTIFICATIONS -----------
-\\section{Coursework \\& Certifications}
- \\begin{itemize}[leftmargin=0.15in, label={}]
-    \\small{\\item{
+  const courseworkSection = courseworkLines.length > 0 ? `% ============================================================
+% COURSEWORK & CERTIFICATIONS
+% ============================================================
+\\section*{Coursework & Certifications}
 ${courseworkLines.join('\n')}
-    }}
- \\end{itemize}
 ` : '';
 
   // 5. INVOLVEMENT (FIFTH)
@@ -205,159 +201,164 @@ ${courseworkLines.join('\n')}
   const involvementLines = involvements.map(inv => {
     const parts = inv.split(':');
     if (parts.length > 1) {
-      return `     \\textbf{${escapeLatex(parts[0].trim())}}{: ${escapeLatex(parts.slice(1).join(':').trim())}} \\\\`;
+      return `\\resumeLine
+{${escapeLatex(parts[0].trim())}:}
+{${escapeLatex(parts.slice(1).join(':').trim())}}`;
     }
-    return `     ${escapeLatex(inv)} \\\\`;
+    return `\\resumeLine
+{${escapeLatex(inv)}}
+{}`;
   });
 
-  const involvementSection = involvementLines.length > 0 ? `%----------- INVOLVEMENT -----------
-\\section{Involvement}
- \\begin{itemize}[leftmargin=0.15in, label={}]
-    \\small{\\item{
+  const involvementSection = involvementLines.length > 0 ? `% ============================================================
+% INVOLVEMENT / ACHIEVEMENTS
+% ============================================================
+\\section*{Involvement}
 ${involvementLines.join('\n')}
-    }}
- \\end{itemize}
 ` : '';
 
-  // Professional Summary (Only included if user explicitly provided one)
-  const summary = (resume as any).user_explicit_summary ? resume.professional_summary : '';
-  const summarySection = summary ? `%----------- PROFESSIONAL SUMMARY -----------
-\\section{Professional Summary}
- \\begin{itemize}[leftmargin=0.15in, label={}]
-    \\small{\\item{${escapeLatex(summary)}}}
- \\end{itemize}
-` : '';
-
-  // Work Experience (Only included if candidate explicitly has employment records)
-  const experiences = resume.experiences || [];
-  const expEntries = experiences.map(exp => {
-    const comp = escapeLatex(exp.company_name);
-    const title = escapeLatex(exp.job_title);
-    const dates = escapeLatex(`${exp.start_date || ''} -- ${exp.end_date || 'Present'}`.trim());
-    const loc = escapeLatex(exp.location || '');
-    const bullets = (exp.bullet_points || []).map(bp => `        \\resumeItem{${escapeLatex(bp)}}`).join('\n');
-
-    return `    \\resumeSubheading
-      {${comp}}{${dates}}
-      {${title}}{${loc}}
-      \\resumeItemListStart
-${bullets}
-      \\resumeItemListEnd`;
-  });
-
-  const expSection = expEntries.length > 0 ? `%----------- EXPERIENCE -----------
-\\section{Experience}
-  \\resumeSubHeadingListStart
-${expEntries.join('\n')}
-  \\resumeSubHeadingListEnd
-` : '';
-
-  const ruleColorDef = isBlack ? `\\color{black}` : `\\color{accentColor}`;
-  const titleColorDef = isBlack ? `\\scshape\\raggedright\\large` : `\\scshape\\raggedright\\large\\color{accentColor}`;
-
-  const latexCode = `%-------------------------
-% Resume in LaTeX
-% Author : Snehil Tripathi
-% Based on: Jake's Resume Template
-% 100% Compilable on Overleaf / TeX Live / MiKTeX
-%------------------------
-
-\\documentclass[letterpaper,10pt]{article}
-
-\\usepackage{latexsym}
-\\usepackage[empty]{fullpage}
+  const latexCode = `% ============================================================
+% ATS-FRIENDLY LATEX RESUME
+% A4 - ONE PAGE - COMPACT BUT READABLE
+% ============================================================
+\\documentclass[11pt]{article}
+% ---------------- PACKAGES ----------------
+\\usepackage[
+  a4paper,
+  left=0.55in,
+  right=0.55in,
+  top=0.32in,
+  bottom=0.32in
+]{geometry}
 \\usepackage{titlesec}
-\\usepackage{marvosym}
-\\usepackage[usenames,dvipsnames]{color}
-\\usepackage{verbatim}
 \\usepackage{enumitem}
-\\usepackage[hidelinks]{hyperref}
-\\usepackage{fancyhdr}
-\\usepackage[english]{babel}
-\\usepackage{tabularx}
+\\usepackage{hyperref}
 \\usepackage{fontawesome5}
 \\usepackage{xcolor}
+\\usepackage{tabularx}
+\\usepackage{array}
+\\usepackage{ragged2e}
+\\usepackage[T1]{fontenc}
+\\usepackage{lmodern}
+\\usepackage{parskip}
+\\pagestyle{empty}
 
-% Color configuration
-\\definecolor{accentColor}{HTML}{${color}}
+% ---------------- HYPERLINK SETUP ----------------
+\\hypersetup{
+  colorlinks=false,
+  pdfborder={0 0 0},
+  pdftitle={${fullName} - Resume},
+  pdfsubject={Resume}
+}
 
-\\pagestyle{fancy}
-\\fancyhf{} % clear all header and footer fields
-\\fancyfoot{}
-\\renewcommand{\\headrulewidth}{0pt}
-\\renewcommand{\\footrulewidth}{0pt}
+% ============================================================
+% SECTION FORMATTING
+% ============================================================
+\\titleformat{\\section}
+  {\\large\\bfseries\\scshape}
+  {}
+  {0em}
+  {}
+  [\\vspace{-4pt}\\rule{\\linewidth}{0.8pt}\\vspace{0pt}]
 
-% Adjust margins for standard single page
-\\addtolength{\\oddsidemargin}{-0.5in}
-\\addtolength{\\evensidemargin}{-0.5in}
-\\addtolength{\\textwidth}{1in}
-\\addtolength{\\topmargin}{-.5in}
-\\addtolength{\\textheight}{1.0in}
+\\titlespacing*{\\section}{0pt}{3pt}{2pt}
 
-\\urlstyle{same}
+% ============================================================
+% LIST SPACING
+% ============================================================
+\\setlist[itemize]{
+  leftmargin=*,
+  itemsep=0pt,
+  parsep=0pt,
+  topsep=0pt,
+  partopsep=0pt
+}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\tabcolsep}{0pt}
+\\setlength{\\parskip}{0pt}
 
-\\raggedbottom
-\\raggedright
-\\setlength{\\tabcolsep}{0in}
+% ============================================================
+% CUSTOM COMMANDS
+% ============================================================
+\\newcommand{\\resumeEducation}[5]{
+  \\begin{tabularx}{\\textwidth}{@{}X r@{}}
+    \\textbf{#1} & #4 \\\\
+    \\textit{#3} & \\textit{#5} \\\\
+  \\end{tabularx}
+  \\vspace{-2pt}
+}
 
-% Sections formatting
-\\titleformat{\\section}{
-  \\vspace{-4pt}${titleColorDef}
-}{}{0em}{}[${ruleColorDef}\\titlerule \\vspace{-5pt}]
+\\newcommand{\\resumeProject}[3]{
+  \\vspace{4pt}
+  \\begin{tabularx}{\\textwidth}{@{}X r@{}}
+    \\textbf{#1} \\;|\\; \\textit{#2} & #3 \\\\
+  \\end{tabularx}
+  \\vspace{-1pt}
+}
 
-% Ensure that generate pdf is machine readable/ATS parsable
-\\pdfgentounicode=1
-
-% Custom commands
 \\newcommand{\\resumeItem}[1]{
-  \\item\\small{
-    {#1 \\vspace{-2pt}}
-  }
+  \\item \\RaggedRight #1
 }
 
-\\newcommand{\\resumeSubheading}[4]{
-  \\vspace{-2pt}\\item
-    \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
-      \\textbf{#1} & #2 \\\\
-      \\textit{\\small#3} & \\textit{\\small #4} \\\\
-    \\end{tabular*}\\vspace{-7pt}
+\\newcommand{\\resumeItemListStart}{
+  \\begin{itemize}[
+    leftmargin=*,
+    itemsep=0pt,
+    parsep=0pt,
+    topsep=0pt,
+    partopsep=0pt,
+    label=\\textbullet
+  ]
+}
+\\newcommand{\\resumeItemListEnd}{
+  \\end{itemize}
+  \\vspace{-3pt}
 }
 
-\\newcommand{\\resumeProjectHeading}[2]{
-    \\item
-    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
-      \\small#1 & #2 \\\\
-    \\end{tabular*}\\vspace{-7pt}
+\\newcommand{\\resumeSkill}[2]{
+  \\textbf{#1:} #2 \\par
 }
 
-\\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}
+\\newcommand{\\resumeLine}[2]{
+  \\textbf{#1} #2 \\par
+}
 
-\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
-
-\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}
-\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
-\\newcommand{\\resumeItemListStart}{\\begin{itemize}[leftmargin=0.15in, label={$\\bullet$}]}
-\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
-
-%-------------------------------------------
-%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% ============================================================
+% DOCUMENT START
+% ============================================================
 \\begin{document}
+\\linespread{0.91}\\selectfont
+\\RaggedRight
 
-%---------- HEADING ----------
+% ============================================================
+% HEADER
+% ============================================================
 \\begin{center}
-    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{2pt}
-    \\small ${location} \\\\ \\vspace{2pt}
-    \\small ${contactLine}
+  {\\fontsize{22}{22}\\selectfont \\textbf{${fullName}}}
+  \\\\[1pt]
+  {\\footnotesize ${location}}
+  \\\\[1pt]
+  {\\scriptsize
+${contactLine}
+  }
 \\end{center}
+\\vspace{-9pt}
 
-${summarySection}${eduSection}${expSection}${projSection}${skillsSection}${courseworkSection}${involvementSection}
+${eduSection}
+${projSection}
+${skillsSection}
+${courseworkSection}
+${involvementSection}
+
+% ============================================================
+% END
+% ============================================================
 \\end{document}
 `;
 
   return {
     latexCode,
-    accentColor: `#${color}`,
+    accentColor: `#${accentColorHex.replace(/^#/, '') || '000000'}`,
     isErrorFree: true
   };
 }

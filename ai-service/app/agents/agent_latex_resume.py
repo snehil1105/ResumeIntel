@@ -9,46 +9,21 @@ class LaTeXResumeAgent:
     """
     Agent 10: LaTeX Resume Specialist Agent.
     - Preserves candidate's exact template, section hierarchy, and typography.
-    - Formats Education at the top, followed by Projects, Technical Skills, Coursework, and Involvement.
+    - Generates A4 single-page compact, ATS-friendly LaTeX matching the user's authentic resume.
+    - Formats Education at the top, followed by Projects, Technical Skills, Coursework & Certifications, and Involvement.
     - Ensures every link (Phone, Email, LinkedIn, GitHub, Portfolio, LeetCode, and Project GitHub icons) is fully clickable via \href.
     - Zero compilation errors: precisely escapes &, %, $, #, _, {, }, ~, ^.
     """
 
-    DEFAULT_ACCENT_COLOR = "000000" # Classic Black LaTeX default
+    DEFAULT_ACCENT_COLOR = "000000"
 
     def __init__(self, llm_provider=None):
         self.llm = llm_provider
 
     def extract_style_and_color(self, raw_text: str) -> Dict[str, Any]:
-        """
-        Extracts color definitions and structure from existing resume or LaTeX.
-        """
-        extracted_color = self.DEFAULT_ACCENT_COLOR
-        is_latex_source = False
-
-        if not raw_text:
-            return {"accent_color": extracted_color, "is_latex_source": False}
-
-        if "\\documentclass" in raw_text or "\\begin{document}" in raw_text or "\\section" in raw_text:
-            is_latex_source = True
-
-        html_color_match = re.search(r'\\definecolor\{[^}]+\}\{HTML\}\{([0-9a-fA-F]{6})\}', raw_text)
-        if html_color_match:
-            extracted_color = html_color_match.group(1).upper()
-        else:
-            hex_match = re.search(r'#([0-9a-fA-F]{6})\b', raw_text)
-            if hex_match:
-                extracted_color = hex_match.group(1).upper()
-
-        return {
-            "accent_color": extracted_color,
-            "is_latex_source": is_latex_source
-        }
+        return {"accent_color": self.DEFAULT_ACCENT_COLOR, "is_latex_source": True}
 
     def escape_latex(self, text: Optional[str]) -> str:
-        """
-        Escapes all LaTeX special characters in strict order to guarantee 0 syntax errors.
-        """
         if not text:
             return ""
 
@@ -76,43 +51,34 @@ class LaTeXResumeAgent:
         accent_color_hex: Optional[str] = None,
         font_family: str = "default"
     ) -> str:
-        """
-        Generates 100% valid, compilable LaTeX code based on the exact Jake's Resume template.
-        """
-        color = (accent_color_hex or self.DEFAULT_ACCENT_COLOR).lstrip('#').upper()
-        if len(color) != 6:
-            color = self.DEFAULT_ACCENT_COLOR
-
-        is_black = color in ["000000", "1E293B"]
-
         p_info = resume.personal_info
-        full_name = self.escape_latex(p_info.full_name or "SNEHIL TRIPATHI")
+        full_name = self.escape_latex(p_info.full_name or "SNEHIL TRIPATHI").upper()
         location = self.escape_latex(p_info.location or "Haldwani, Uttarakhand, India - 263139")
         email = p_info.email or "tripatics11@gmail.com"
         phone = p_info.phone or "+91-7900609557"
         
-        linkedin = p_info.linkedin_url or "https://linkedin.com/in/snehil-tripathi"
-        github = p_info.github_url or "https://github.com/snehiltripathi"
-        portfolio = p_info.portfolio_url or "https://snehil-tripathi.dev"
-        leetcode = getattr(p_info, 'leetcode_url', None) or "https://leetcode.com/u/snehiltripathi"
+        linkedin = p_info.linkedin_url or "https://linkedin.com/in/snehil-tripathi-38031131a"
+        github = p_info.github_url or "https://github.com/snehil1105"
+        portfolio = p_info.portfolio_url or "https://snehil-portfolio-eosin.vercel.app/"
+        leetcode = getattr(p_info, 'leetcode_url', None) or "https://leetcode.com/u/Snehiltripathi05/"
 
-        # Clickable Contact line with fontawesome icons
+        # Contact items
         contact_parts = []
         if phone:
             clean_phone = phone.replace(' ', '').replace('-', '')
-            contact_parts.append(f"\\href{{tel:{clean_phone}}}{{\\faPhone*\\ {self.escape_latex(phone)}}}")
+            contact_parts.append(f"\\faPhone\\ \\href{{tel:{clean_phone}}}{{{self.escape_latex(phone)}}}")
         if email:
-            contact_parts.append(f"\\href{{mailto:{email}}}{{\\faEnvelope\\ {self.escape_latex(email)}}}")
+            contact_parts.append(f"\\faEnvelope\\ \\href{{mailto:{email}}}{{{self.escape_latex(email)}}}")
         if linkedin:
-            contact_parts.append(f"\\href{{{linkedin}}}{{\\faLinkedin\\ LinkedIn}}")
+            contact_parts.append(f"\\faLinkedin\\ \\href{{{linkedin}}}{{LinkedIn}}")
         if github:
-            contact_parts.append(f"\\href{{{github}}}{{\\faGithub\\ GitHub}}")
+            contact_parts.append(f"\\faGithub\\ \\href{{{github}}}{{GitHub}}")
         if portfolio:
-            contact_parts.append(f"\\href{{{portfolio}}}{{\\faGlobe\\ Portfolio}}")
+            contact_parts.append(f"\\faGlobe\\ \\href{{{portfolio}}}{{Portfolio}}")
         if leetcode:
-            contact_parts.append(f"\\href{{{leetcode}}}{{\\faCode\\ LeetCode}}")
+            contact_parts.append(f"\\faCode\\ \\href{{{leetcode}}}{{LeetCode}}")
 
-        contact_line = " $|$ ".join(contact_parts)
+        contact_line = "\n\\quad\n".join(contact_parts)
 
         # 1. EDUCATION (AT THE TOP)
         edu_entries = []
@@ -122,54 +88,73 @@ class LaTeXResumeAgent:
             dates = self.escape_latex(f"{edu.start_date or ''} -- {edu.end_date or ''}".strip(' -'))
             gpa = self.escape_latex(edu.grade_or_gpa) if edu.grade_or_gpa else ""
             
-            entry = f"""    \\resumeSubheading
-      {{{inst}}}{{{dates}}}
-      {{{deg}}}{{{gpa}}}"""
+            entry = f"""\\resumeEducation
+{{{inst}}}
+{{}}
+{{{deg}}}
+{{{dates}}}
+{{{gpa}}}"""
             edu_entries.append(entry)
 
-        edu_section = ""
-        if edu_entries:
-            edu_section = f"""%----------- EDUCATION -----------
-\\section{{Education}}
-  \\resumeSubHeadingListStart
+        edu_section = f"""% ============================================================
+% EDUCATION
+% ============================================================
+\\section*{{Education}}
 {chr(10).join(edu_entries)}
-  \\resumeSubHeadingListEnd
-"""
+""" if edu_entries else ""
 
         # 2. PROJECTS (SECOND)
         proj_entries = []
         for proj in (resume.projects or []):
             title = self.escape_latex(proj.title)
-            repo = proj.repo_url or (f"{github}/{proj.title.replace(' ', '-')}" if github else "")
-            title_with_link = f"\\textbf{{{title}}} \\href{{{repo}}}{{\\faGithub}}" if repo else f"\\textbf{{{title}}}"
+            repo = proj.repo_url
+            title_with_link = f"{title} \\href{{{repo}}}{{\\faGithub}}" if repo else title
             tech = ", ".join([self.escape_latex(t) for t in (proj.technologies or [])])
-            dates = self.escape_latex(proj.end_date or proj.start_date or "June 2026")
+            dates = self.escape_latex(proj.end_date or proj.start_date or "May 2026")
             
             bullets = []
             for bp in (proj.bullet_points or []):
                 clean_bp = self.escape_latex(bp)
-                bullets.append(f"        \\resumeItem{{{clean_bp}}}")
+                bullets.append(f"""\\resumeItem{{
+{clean_bp}
+}}""")
 
-            entry = f"""    \\resumeProjectHeading
-      {{{title_with_link} $|$ \\emph{{{tech}}}}}{{{dates}}}
-      \\resumeItemListStart
+            entry = f"""% ---------------- {title} ----------------
+\\resumeProject
+{{{title_with_link}}}
+{{{tech}}}
+{{{dates}}}
+\\resumeItemListStart
 {chr(10).join(bullets)}
-      \\resumeItemListEnd"""
+\\resumeItemListEnd"""
             proj_entries.append(entry)
 
-        proj_section = ""
-        if proj_entries:
-            proj_section = f"""%----------- PROJECTS -----------
-\\section{{Projects}}
-  \\resumeSubHeadingListStart
+        proj_section = f"""% ============================================================
+% PROJECTS
+% ============================================================
+\\section*{{Projects}}
 {chr(10).join(proj_entries)}
-  \\resumeSubHeadingListEnd
-"""
+""" if proj_entries else ""
 
         # 3. TECHNICAL SKILLS (THIRD)
         categories: Dict[str, List[str]] = {}
         for s in (resume.skills or []):
-            cat = s.category or "Technologies and Frameworks"
+            raw_cat = (s.category or "").lower()
+            if "language" in raw_cat:
+                cat = "Programming Languages"
+            elif "framework" in raw_cat or "technologies" in raw_cat:
+                cat = "Technologies and Frameworks"
+            elif "tool" in raw_cat or "cloud" in raw_cat:
+                cat = "Development Tools"
+            elif "gen" in raw_cat or "agent" in raw_cat:
+                cat = "Generative AI & Agentic AI"
+            elif "ml" in raw_cat or "machine learning" in raw_cat:
+                cat = "Machine Learning & Data Analysis"
+            elif "database" in raw_cat:
+                cat = "Databases"
+            else:
+                cat = s.category or "Technologies and Frameworks"
+
             if cat not in categories:
                 categories[cat] = []
             categories[cat].append(self.escape_latex(s.skill_name))
@@ -178,18 +163,16 @@ class LaTeXResumeAgent:
         for cat, items in categories.items():
             cat_escaped = self.escape_latex(cat)
             items_str = ", ".join(items)
-            skill_lines.append(f"     \\textbf{{{cat_escaped}}}{{: {items_str}}} \\\\")
+            skill_lines.append(f"""\\resumeSkill
+{{{cat_escaped}}}
+{{{items_str}}}""")
 
-        skills_section = ""
-        if skill_lines:
-            skills_section = f"""%----------- TECHNICAL SKILLS -----------
-\\section{{Technical Skills}}
- \\begin{{itemize}}[leftmargin=0.15in, label={{}}]
-    \\small{{\\item{{
+        skills_section = f"""% ============================================================
+% TECHNICAL SKILLS
+% ============================================================
+\\section*{{Technical Skills}}
 {chr(10).join(skill_lines)}
-    }}}}
- \\end{{itemize}}
-"""
+""" if skill_lines else ""
 
         # 4. COURSEWORK & CERTIFICATIONS (FOURTH)
         coursework = getattr(resume, 'coursework', None) or (resume.certifications if resume.certifications else [
@@ -204,17 +187,19 @@ class LaTeXResumeAgent:
         for cw in coursework:
             parts = cw.split(':')
             if len(parts) > 1:
-                cw_lines.append(f"     \\textbf{{{self.escape_latex(parts[0].strip())}}}{{: {self.escape_latex(':'.join(parts[1:]).strip())}}} \\\\")
+                cw_lines.append(f"""\\resumeSkill
+{{{self.escape_latex(parts[0].strip())}}}
+{{{self.escape_latex(':'.join(parts[1:]).strip())}}}""")
             else:
-                cw_lines.append(f"     {self.escape_latex(cw)} \\\\")
+                cw_lines.append(f"""\\resumeSkill
+{{Certification}}
+{{{self.escape_latex(cw)}}}""")
 
-        coursework_section = f"""%----------- COURSEWORK & CERTIFICATIONS -----------
-\\section{{Coursework \\& Certifications}}
- \\begin{{itemize}}[leftmargin=0.15in, label={{}}]
-    \\small{{\\item{{
+        coursework_section = f"""% ============================================================
+% COURSEWORK & CERTIFICATIONS
+% ============================================================
+\\section*{{Coursework & Certifications}}
 {chr(10).join(cw_lines)}
-    }}}}
- \\end{{itemize}}
 """
 
         # 5. INVOLVEMENT (FIFTH)
@@ -226,147 +211,157 @@ class LaTeXResumeAgent:
         for inv in involvements:
             parts = inv.split(':')
             if len(parts) > 1:
-                inv_lines.append(f"     \\textbf{{{self.escape_latex(parts[0].strip())}}}{{: {self.escape_latex(':'.join(parts[1:]).strip())}}} \\\\")
+                inv_lines.append(f"""\\resumeLine
+{{{self.escape_latex(parts[0].strip())}:}}
+{{{self.escape_latex(':'.join(parts[1:]).strip())}}}""")
             else:
-                inv_lines.append(f"     {self.escape_latex(inv)} \\\\")
+                inv_lines.append(f"""\\resumeLine
+{{{self.escape_latex(inv)}}}
+{{}}""")
 
-        involvement_section = f"""%----------- INVOLVEMENT -----------
-\\section{{Involvement}}
- \\begin{{itemize}}[leftmargin=0.15in, label={{}}]
-    \\small{{\\item{{
+        involvement_section = f"""% ============================================================
+% INVOLVEMENT / ACHIEVEMENTS
+% ============================================================
+\\section*{{Involvement}}
 {chr(10).join(inv_lines)}
-    }}}}
- \\end{{itemize}}
 """
 
-        # Work Experience (Only if explicitly present)
-        exp_entries = []
-        for exp in (resume.experiences or []):
-            comp = self.escape_latex(exp.company_name)
-            title = self.escape_latex(exp.job_title)
-            dates = self.escape_latex(f"{exp.start_date or ''} -- {exp.end_date or 'Present'}".strip(' -'))
-            loc = self.escape_latex(exp.location) if exp.location else ""
-            bullets = [f"        \\resumeItem{{{self.escape_latex(bp)}}}" for bp in (exp.bullet_points or [])]
-            exp_entries.append(f"""    \\resumeSubheading
-      {{{comp}}}{{{dates}}}
-      {{{title}}}{{{loc}}}
-      \\resumeItemListStart
-{chr(10).join(bullets)}
-      \\resumeItemListEnd""")
-
-        exp_section = f"""%----------- EXPERIENCE -----------
-\\section{{Experience}}
-  \\resumeSubHeadingListStart
-{chr(10).join(exp_entries)}
-  \\resumeSubHeadingListEnd
-""" if exp_entries else ""
-
-        title_color = "\\scshape\\raggedright\\large" if is_black else "\\scshape\\raggedright\\large\\color{accentColor}"
-        rule_color = "\\color{black}" if is_black else "\\color{accentColor}"
-
-        latex_template = f"""%-------------------------
-% Resume in LaTeX
-% Author : Snehil Tripathi
-% Based on: Jake's Resume Template
-% 100% Compilable on Overleaf / TeX Live / MiKTeX
-%------------------------
-
-\\documentclass[letterpaper,10pt]{{article}}
-
-\\usepackage{{latexsym}}
-\\usepackage[empty]{{fullpage}}
+        latex_template = f"""% ============================================================
+% ATS-FRIENDLY LATEX RESUME
+% A4 - ONE PAGE - COMPACT BUT READABLE
+% ============================================================
+\\documentclass[11pt]{{article}}
+% ---------------- PACKAGES ----------------
+\\usepackage[
+  a4paper,
+  left=0.55in,
+  right=0.55in,
+  top=0.32in,
+  bottom=0.32in
+]{{geometry}}
 \\usepackage{{titlesec}}
-\\usepackage{{marvosym}}
-\\usepackage[usenames,dvipsnames]{{color}}
-\\usepackage{{verbatim}}
 \\usepackage{{enumitem}}
-\\usepackage[hidelinks]{{hyperref}}
-\\usepackage{{fancyhdr}}
-\\usepackage[english]{{babel}}
-\\usepackage{{tabularx}}
+\\usepackage{{hyperref}}
 \\usepackage{{fontawesome5}}
 \\usepackage{{xcolor}}
+\\usepackage{{tabularx}}
+\\usepackage{{array}}
+\\usepackage{{ragged2e}}
+\\usepackage[T1]{{fontenc}}
+\\usepackage{{lmodern}}
+\\usepackage{{parskip}}
+\\pagestyle{{empty}}
 
-% Color configuration
-\\definecolor{{accentColor}}{{HTML}}{{{color}}}
+% ---------------- HYPERLINK SETUP ----------------
+\\hypersetup{{
+  colorlinks=false,
+  pdfborder={{0 0 0}},
+  pdftitle={{{full_name} - Resume}},
+  pdfsubject={{Resume}}
+}}
 
-\\pagestyle{{fancy}}
-\\fancyhf{{}} % clear all header and footer fields
-\\fancyfoot{{}}
-\\renewcommand{{\\headrulewidth}}{{0pt}}
-\\renewcommand{{\\footrulewidth}}{{0pt}}
+% ============================================================
+% SECTION FORMATTING
+% ============================================================
+\\titleformat{{\\section}}
+  {{\\large\\bfseries\\scshape}}
+  {{}}
+  {{0em}}
+  {{}}
+  [\\vspace{{-4pt}}\\rule{{\\linewidth}}{{0.8pt}}\\vspace{{0pt}}]
 
-% Adjust margins for single page layout
-\\addtolength{{\\oddsidemargin}}{{-0.5in}}
-\\addtolength{{\\evensidemargin}}{{-0.5in}}
-\\addtolength{{\\textwidth}}{{1in}}
-\\addtolength{{\\topmargin}}{{-.5in}}
-\\addtolength{{\\textheight}}{{1.0in}}
+\\titlespacing*{{\\section}}{{0pt}}{{3pt}}{{2pt}}
 
-\\urlstyle{{same}}
+% ============================================================
+% LIST SPACING
+% ============================================================
+\\setlist[itemize]{{
+  leftmargin=*,
+  itemsep=0pt,
+  parsep=0pt,
+  topsep=0pt,
+  partopsep=0pt
+}}
+\\setlength{{\\parindent}}{{0pt}}
+\\setlength{{\\tabcolsep}}{{0pt}}
+\\setlength{{\\parskip}}{{0pt}}
 
-\\raggedbottom
-\\raggedright
-\\setlength{{\\tabcolsep}}{{0in}}
+% ============================================================
+% CUSTOM COMMANDS
+% ============================================================
+\\newcommand{{\\resumeEducation}}[5]{{
+  \\begin{{tabularx}}{{\\textwidth}}{{@{{}}X r@{{}}}}
+    \\textbf{{#1}} & #4 \\\\
+    \\textit{{#3}} & \\textit{{#5}} \\\\
+  \\end{{tabularx}}
+  \\vspace{{-2pt}}
+}}
 
-% Sections formatting
-\\titleformat{{\\section}}{{
-  \\vspace{{-4pt}}{title_color}
-}}{{}}{{0em}}{{}}[{rule_color}\\titlerule \\vspace{{-5pt}}]
+\\newcommand{{\\resumeProject}}[3]{{
+  \\vspace{{4pt}}
+  \\begin{{tabularx}}{{\\textwidth}}{{@{{}}X r@{{}}}}
+    \\textbf{{#1}} \\;|\\; \\textit{{#2}} & #3 \\\\
+  \\end{{tabularx}}
+  \\vspace{{-1pt}}
+}}
 
-% Ensure that generate pdf is machine readable/ATS parsable
-\\pdfgentounicode=1
-
-% Custom commands
 \\newcommand{{\\resumeItem}}[1]{{
-  \\item\\small{{
-    {{#1 \\vspace{{-2pt}}}}
-  }}
+  \\item \\RaggedRight #1
 }}
 
-\\newcommand{{\\resumeSubheading}}[4]{{
-  \\vspace{{-2pt}}\\item
-    \\begin{{tabular*}}{{0.97\\textwidth}}[t]{{l@{{\\extracolsep{{\\fill}}}}r}}
-      \\textbf{{#1}} & #2 \\\\
-      \\textit{{\\small#3}} & \\textit{{\\small #4}} \\\\
-    \\end{{tabular*}}\\vspace{{-7pt}}
+\\newcommand{{\\resumeItemListStart}}{{
+  \\begin{{itemize}}[
+    leftmargin=*,
+    itemsep=0pt,
+    parsep=0pt,
+    topsep=0pt,
+    partopsep=0pt,
+    label=\\textbullet
+  ]
+}}
+\\newcommand{{\\resumeItemListEnd}}{{
+  \\end{{itemize}}
+  \\vspace{{-3pt}}
 }}
 
-\\newcommand{{\\resumeProjectHeading}}[2]{{
-    \\item
-    \\begin{{tabular*}}{{0.97\\textwidth}}{{l@{{\\extracolsep{{\\fill}}}}r}}
-      \\small#1 & #2 \\\\
-    \\end{{tabular*}}\\vspace{{-7pt}}
+\\newcommand{{\\resumeSkill}}[2]{{
+  \\textbf{{#1:}} #2 \\par
 }}
 
-\\newcommand{{\\resumeSubItem}}[1]{{\\resumeItem{{#1}}\\vspace{{-4pt}}}}
+\\newcommand{{\\resumeLine}}[2]{{
+  \\textbf{{#1}} #2 \\par
+}}
 
-\\renewcommand\\labelitemii{{$\\vcenter{{\\hbox{{\\tiny$\\bullet$}}}}$}}
-
-\\newcommand{{\\resumeSubHeadingListStart}}{{\\begin{{itemize}}[leftmargin=0.15in, label={{}}]}}
-\\newcommand{{\\resumeSubHeadingListEnd}}{{\\end{{itemize}}}}
-\\newcommand{{\\resumeItemListStart}}{{\\begin{{itemize}}[leftmargin=0.15in, label={{$\\bullet$}}]}}
-\\newcommand{{\\resumeItemListEnd}}{{\\end{{itemize}}\\vspace{{-5pt}}}}
-
-%-------------------------------------------
-%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% ============================================================
+% DOCUMENT START
+% ============================================================
 \\begin{{document}}
+\\linespread{{0.91}}\\selectfont
+\\RaggedRight
 
-%----------HEADING----------
+% ============================================================
+% HEADER
+% ============================================================
 \\begin{{center}}
-    \\textbf{{\\Huge \\scshape {full_name}}} \\\\ \\vspace{{2pt}}
-    \\small {location} \\\\ \\vspace{{2pt}}
-    \\small {contact_line}
+  {{\\fontsize{{22}}{{22}}\\selectfont \\textbf{{{full_name}}}}}
+  \\\\[1pt]
+  {{\\footnotesize {location}}}
+  \\\\[1pt]
+  {{\\scriptsize
+{contact_line}
+  }}
 \\end{{center}}
+\\vspace{{-9pt}}
 
 {edu_section}
-{exp_section}
 {proj_section}
 {skills_section}
 {coursework_section}
 {involvement_section}
 
+% ============================================================
+% END
+% ============================================================
 \\end{{document}}
 """
         return latex_template
