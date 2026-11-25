@@ -124,21 +124,11 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
 
   const coursework = (resume.coursework && resume.coursework.length > 0)
     ? resume.coursework
-    : (resume.certifications && resume.certifications.length > 0 ? resume.certifications : [
-        "Internet of Things (IoT): IIT Kharagpur / NPTEL",
-        "Agentic AI Certified Foundations Associate: Oracle University",
-        "IBM AI Engineering Professional Certificate: Coursera",
-        "Cloud Computing: IIT Kharagpur / NPTEL",
-        "Marketing Analysis: IIT Kharagpur / NPTEL",
-        "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-      ]);
+    : (resume.certifications || []);
 
   const involvements = (resume.involvements && resume.involvements.length > 0)
     ? resume.involvements
-    : (resume.achievements && resume.achievements.length > 0 ? resume.achievements : [
-        "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
-        "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
-      ]);
+    : (resume.achievements || []);
 
   return (
     <div className="space-y-4">
@@ -276,7 +266,7 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
             }}
             className="bg-white text-black shadow-2xl p-8 md:p-12 transition-transform duration-150 leading-normal select-text text-[11pt]"
           >
-            {/* Header: SNEHIL TRIPATHI */}
+            {/* Header: Candidate Full Name */}
             <div className="text-center pb-2">
               <h1 
                 style={{ color: accentColor }}

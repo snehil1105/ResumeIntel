@@ -40,9 +40,13 @@ import { generateLatexCode } from '../utils/latexGenerator';
 function getProjectDisplayName(rawTitle: string, firstBullet?: string): string {
   if (!rawTitle) return "Technical Project";
   if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{4})/i.test(rawTitle.trim())) {
-    const qMatch = firstBullet ? firstBullet.match(/["']([^"']+)["']/) : null;
+    const qMatch = firstBullet ? firstBullet.match(/["'“]([^"'”]+)["'”]/) : null;
     if (qMatch && qMatch[1]) {
-      return qMatch[1];
+      return qMatch[1].trim();
+    }
+    if (firstBullet) {
+      const words = firstBullet.split(/\s+/).filter(w => !/^(built|engineered|developed|created|designed)/i.test(w)).slice(0, 4);
+      if (words.length > 0) return words.join(' ');
     }
   }
   return rawTitle.replace(/\(.*?\)/g, '').trim() || rawTitle;
@@ -381,6 +385,7 @@ Minimum Qualifications:
       setIsCompleted(false);
       setDomainAlignment(null);
       setTailoredResume(null);
+      setDetailedChanges([]);
     } catch (err: any) {
       console.error("Upload error:", err);
       alert("Could not extract text automatically. You can paste your resume text directly below.");
@@ -401,6 +406,7 @@ Minimum Qualifications:
     setIsCompleted(false);
     setDomainAlignment(null);
     setTailoredResume(null);
+    setDetailedChanges([]);
   };
 
   // Run Multi-Agent Customization using User's REAL details

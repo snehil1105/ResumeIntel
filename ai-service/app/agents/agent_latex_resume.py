@@ -6,7 +6,7 @@ from app.models.resume import MasterResume, SkillItem
 logger = logging.getLogger(__name__)
 
 class LaTeXResumeAgent:
-    """
+    r"""
     Agent 10: LaTeX Resume Specialist Agent.
     - Preserves candidate's exact template, section hierarchy, and typography.
     - Generates A4 single-page compact, ATS-friendly LaTeX matching the user's authentic resume.
@@ -52,15 +52,15 @@ class LaTeXResumeAgent:
         font_family: str = "default"
     ) -> str:
         p_info = resume.personal_info
-        full_name = self.escape_latex(p_info.full_name or "SNEHIL TRIPATHI").upper()
-        location = self.escape_latex(p_info.location or "Haldwani, Uttarakhand, India - 263139")
-        email = p_info.email or "tripatics11@gmail.com"
-        phone = p_info.phone or "+91-7900609557"
+        full_name = self.escape_latex(p_info.full_name or "Candidate Name").upper()
+        location = self.escape_latex(p_info.location or "")
+        email = p_info.email or ""
+        phone = p_info.phone or ""
         
-        linkedin = p_info.linkedin_url or "https://linkedin.com/in/snehil-tripathi-38031131a"
-        github = p_info.github_url or "https://github.com/snehil1105"
-        portfolio = p_info.portfolio_url or "https://snehil-portfolio-eosin.vercel.app/"
-        leetcode = getattr(p_info, 'leetcode_url', None) or "https://leetcode.com/u/Snehiltripathi05/"
+        linkedin = p_info.linkedin_url or ""
+        github = p_info.github_url or ""
+        portfolio = p_info.portfolio_url or ""
+        leetcode = getattr(p_info, 'leetcode_url', None) or ""
 
         # Contact items
         contact_parts = []
@@ -175,14 +175,7 @@ class LaTeXResumeAgent:
 """ if skill_lines else ""
 
         # 4. COURSEWORK & CERTIFICATIONS (FOURTH)
-        coursework = getattr(resume, 'coursework', None) or (resume.certifications if resume.certifications else [
-            "Internet of Things (IoT): IIT Kharagpur / NPTEL",
-            "Agentic AI Certified Foundations Associate: Oracle University",
-            "IBM AI Engineering Professional Certificate: Coursera",
-            "Cloud Computing: IIT Kharagpur / NPTEL",
-            "Marketing Analysis: IIT Kharagpur / NPTEL",
-            "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-        ])
+        coursework = getattr(resume, 'coursework', None) or resume.certifications or []
         cw_lines = []
         for cw in coursework:
             parts = cw.split(':')
@@ -200,13 +193,10 @@ class LaTeXResumeAgent:
 % ============================================================
 \\section*{{Coursework & Certifications}}
 {chr(10).join(cw_lines)}
-"""
+""" if cw_lines else ""
 
         # 5. INVOLVEMENT (FIFTH)
-        involvements = getattr(resume, 'involvements', None) or (resume.achievements if resume.achievements else [
-            "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
-            "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
-        ])
+        involvements = getattr(resume, 'involvements', None) or resume.achievements or []
         inv_lines = []
         for inv in involvements:
             parts = inv.split(':')
@@ -224,7 +214,7 @@ class LaTeXResumeAgent:
 % ============================================================
 \\section*{{Involvement}}
 {chr(10).join(inv_lines)}
-"""
+""" if inv_lines else ""
 
         latex_template = f"""% ============================================================
 % ATS-FRIENDLY LATEX RESUME

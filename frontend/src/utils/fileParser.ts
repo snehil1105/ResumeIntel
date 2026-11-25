@@ -176,7 +176,9 @@ export async function extractTextFromFile(file: File): Promise<string> {
  * Dynamically identifies real candidate name, contact, education, experience, projects, skills, coursework & involvement.
  */
 export function parseRawResumeToStructured(rawText: string): MasterResume {
-  const cleanText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  let cleanText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // De-hyphenate broken words across line wraps
+  cleanText = cleanText.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
 
   // If this is Snehil Tripathi's resume, preserve 100% authoritative master fidelity
   if (cleanText.toUpperCase().includes('SNEHIL') && cleanText.toUpperCase().includes('TRIPATHI')) {
@@ -199,21 +201,21 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
   const phone = phoneMatch ? phoneMatch[0] : '';
 
   // 3. Extract Links
-  const linkedinMatch = cleanText.match(/(?:linkedin\.com\/in\/|linkedin:\s*)([\w\-_]+)/i);
+  const linkedinMatch = cleanText.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w\-_]+)/i);
   const linkedin_url = linkedinMatch ? `https://linkedin.com/in/${linkedinMatch[1]}` : '';
 
-  const githubMatch = cleanText.match(/(?:github\.com\/|github:\s*)([\w\-_]+)/i);
+  const githubMatch = cleanText.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([\w\-_]+)/i);
   const github_url = githubMatch ? `https://github.com/${githubMatch[1]}` : '';
 
-  const leetcodeMatch = cleanText.match(/(?:leetcode\.com\/(?:u\/)?|leetcode:\s*)([\w\-_]+)/i);
+  const leetcodeMatch = cleanText.match(/(?:https?:\/\/)?(?:www\.)?leetcode\.com\/(?:u\/)?([\w\-_]+)/i);
   const leetcode_url = leetcodeMatch ? `https://leetcode.com/u/${leetcodeMatch[1]}` : '';
 
   const portfolioMatch = cleanText.match(/https?:\/\/[\w\.\-]+\.(?:dev|me|io|tech|app)/i);
-  const portfolio_url = portfolioMatch ? portfolioMatch[0] : '';
+  const portfolio_url = portfolioMatch && !portfolioMatch[0].includes('linkedin') && !portfolioMatch[0].includes('github') ? portfolioMatch[0] : '';
 
   // 4. Extract Name
   let fullName = 'Candidate Name';
-  for (const line of lines.slice(0, 10)) {
+  for (const line of lines.slice(0, 8)) {
     const lower = line.toLowerCase();
     if (lower.includes('resume') || lower.includes('cv') || lower.includes('curriculum vitae') || lower.includes('contact') || lower.includes('page') || lower.includes('education')) {
       continue;
@@ -231,18 +233,18 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
   // 5. Detect Location
   let location = 'Remote / Hybrid';
   const locMatch = cleanText.match(/([A-Za-z\s]+,\s*[A-Za-z\s]+-\s*\d{5,6}|[A-Za-z\s]+,\s*[A-Za-z]{2}(?:\s+\d{5})?|[A-Za-z\s]+,\s*(?:USA|India|Canada|UK|Germany|Remote))/);
-  if (locMatch && locMatch[0].length < 60) {
+  if (locMatch && locMatch[0].length < 60 && locMatch[0].toLowerCase() !== fullName.toLowerCase()) {
     location = locMatch[0].trim();
   }
 
   // 6. Section Partitioning
   const sectionKeywords: Record<string, string[]> = {
-    education: ['education', 'academic background', 'qualifications'],
-    experience: ['experience', 'work experience', 'employment history'],
-    projects: ['projects', 'personal projects', 'technical projects', 'academic projects'],
-    skills: ['technical skills', 'skills', 'technologies', 'core competencies'],
+    education: ['education', 'academic background', 'qualifications', 'academics'],
+    experience: ['experience', 'work experience', 'employment history', 'internships'],
+    projects: ['projects', 'personal projects', 'technical projects', 'academic projects', 'key projects'],
+    skills: ['technical skills', 'skills', 'technologies', 'core competencies', 'skills & tools'],
     coursework: ['coursework & certifications', 'coursework and certifications', 'certifications & coursework', 'coursework', 'certifications'],
-    involvement: ['involvement', 'extracurricular', 'extracurriculars', 'activities', 'leadership', 'involvement & extracurriculars']
+    involvement: ['involvement', 'extracurricular', 'extracurriculars', 'activities', 'leadership', 'involvement & extracurriculars', 'achievements']
   };
 
   const sectionBuckets: Record<string, string[]> = {
@@ -273,150 +275,184 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     }
   }
 
-  // 7. Parse Education
+  // 7. Parse Education (Protected)
   const educations: ProtectedEducation[] = [];
-  const eduLines = sectionBuckets.education.length > 0 ? sectionBuckets.education : lines.filter(l => /university|college|institute|school|bachelor|master|b\.tech/i.test(l));
+  const eduLines = sectionBuckets.education.length > 0 ? sectionBuckets.education : lines.filter(l => /university|college|institute|school|academy/i.test(l));
   let curInst = '';
   let curDeg = '';
   let curDates = '';
   let curGpa = '';
 
+  const saveCurrentEdu = () => {
+    if (!curInst) return;
+    const isSchool = /school|vidyalaya|high school|convent/i.test(curInst);
+    const deg = curDeg || (isSchool ? 'Secondary Education' : 'Bachelor of Science in Technical Field');
+    const field = isSchool ? '' : 'Computer Science & Engineering';
+
+    const dateParts = curDates ? curDates.split(/[-–—]|\bto\b/).map(p => p.trim()).filter(Boolean) : [];
+    const exists = educations.some(e => e.institution_name.toLowerCase() === curInst.toLowerCase() && e.degree.toLowerCase() === deg.toLowerCase());
+    if (!exists) {
+      educations.push({
+        id: `edu-${educations.length + 1}`,
+        institution_name: curInst,
+        degree: deg,
+        field_of_study: field,
+        start_date: dateParts[0] || curDates,
+        end_date: dateParts[1] || dateParts[0] || curDates,
+        grade_or_gpa: curGpa,
+        is_verified: true
+      });
+    }
+  };
+
   for (const line of eduLines) {
-    const hasInst = /university|college|institute|school|academy/i.test(line);
-    if (hasInst && line.length < 90) {
-      if (curInst) {
-        const isSchool = /school|vidyalaya/i.test(curInst);
-        educations.push({
-          id: `edu-${educations.length + 1}`,
-          institution_name: curInst,
-          degree: curDeg || (isSchool ? 'Secondary Education' : 'Bachelor of Science in Technical Field'),
-          field_of_study: isSchool ? '' : 'Computer Science & Engineering',
-          start_date: curDates.split(/[-–—to]+/)[0]?.trim() || curDates,
-          end_date: curDates.split(/[-–—to]+/)[1]?.trim() || curDates,
-          grade_or_gpa: curGpa,
-          is_verified: true
-        });
-      }
-      curInst = line;
+    const hasInst = /university|college|institute|school|academy/i.test(line) && line.length < 90;
+    const hasDeg = /b\.tech|bachelor|master|m\.tech|b\.s|intermediate|matriculation|12th|10th|secondary/i.test(line);
+
+    const dMatch = line.match(/\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}|Present|Current))?)\b/i);
+    const lineDates = dMatch ? dMatch[1].trim() : '';
+
+    const gMatch = line.match(/(?:GPA|CGPA|Grade)[\s:]*([0-9\.]+(?:\s*\/\s*[0-9\.]+)?%?)|([0-9]{1,2}(?:\.[0-9]+)?\s*%)/i);
+    const lineGpa = gMatch ? (gMatch[1] || gMatch[2]) : '';
+
+    if (hasInst && !hasDeg) {
+      saveCurrentEdu();
+      let cleanInst = line;
+      if (lineDates) cleanInst = cleanInst.replace(lineDates, '').trim();
+      if (lineGpa) cleanInst = cleanInst.replace(lineGpa, '').trim();
+      curInst = cleanInst.replace(/^[–\-|,\s]+|[–\-|,\s]+$/g, '');
       curDeg = '';
-      curDates = '';
-      curGpa = '';
+      curDates = lineDates;
+      curGpa = lineGpa;
       continue;
     }
 
-    if (/b\.tech|bachelor|master|m\.tech|b\.s|intermediate|matriculation|12th|10th/i.test(line)) {
-      curDeg = line;
+    if (hasDeg) {
+      curDeg = line.replace(/^[–\-|,\s]+|[–\-|,\s]+$/g, '');
     }
-    const dMatch = line.match(/\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}|Present|Current))?)\b/i);
-    if (dMatch && !curDates) curDates = dMatch[1].trim();
 
-    const gMatch = line.match(/(?:GPA|CGPA|Grade)[\s:]*([0-9\.]+(?:\s*\/\s*[0-9\.]+)?%?)|([0-9]{1,2}(?:\.[0-9]+)?\s*%)/i);
-    if (gMatch && !curGpa) curGpa = gMatch[1] || gMatch[2];
+    if (lineDates) curDates = lineDates;
+    if (lineGpa) curGpa = lineGpa;
   }
+  saveCurrentEdu();
 
-  if (curInst) {
-    const isSchool = /school|vidyalaya/i.test(curInst);
-    educations.push({
-      id: `edu-${educations.length + 1}`,
-      institution_name: curInst,
-      degree: curDeg || (isSchool ? 'Secondary Education' : 'Bachelor of Science'),
-      field_of_study: isSchool ? '' : 'Computer Science & Engineering',
-      start_date: curDates.split(/[-–—to]+/)[0]?.trim() || curDates,
-      end_date: curDates.split(/[-–—to]+/)[1]?.trim() || curDates,
-      grade_or_gpa: curGpa,
-      is_verified: true
-    });
-  }
-
-  // 8. Parse Projects (NEVER treat dates as titles)
+  // 8. Parse Projects (Intelligent multi-line bullet accumulator)
   const projects: ResumeProject[] = [];
   const projLines = sectionBuckets.projects;
   let pTitle = '';
   let pTechs: string[] = [];
   let pBullets: string[] = [];
-  let pDate = 'June 2026';
+  let pDate = '';
   let pRepo = '';
+
+  const dateRegex = /^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+)?(?:19|20)\d{2}(?:\s*\(.*?\))?(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?/i;
+
+  const saveCurrentProj = () => {
+    if (!pTitle && pBullets.length === 0) return;
+
+    let finalTitle = pTitle;
+    if (!finalTitle || dateRegex.test(finalTitle)) {
+      if (pBullets.length > 0) {
+        const qMatch = pBullets[0].match(/["'“]([^"'”]+)["'”]/);
+        if (qMatch && qMatch[1]) {
+          finalTitle = qMatch[1].trim();
+        } else {
+          const words = pBullets[0].split(/\s+/).slice(0, 4);
+          finalTitle = words.join(' ') || 'Technical Project';
+        }
+      } else {
+        finalTitle = 'Technical Project';
+      }
+    }
+
+    projects.push({
+      id: `proj-${projects.length + 1}`,
+      title: finalTitle,
+      role: 'Developer',
+      start_date: pDate,
+      end_date: pDate,
+      summary: pBullets[0] || '',
+      technologies: pTechs,
+      bullet_points: pBullets,
+      repo_url: pRepo,
+      is_verified: true
+    });
+
+    pBullets = [];
+    pTechs = [];
+    pRepo = '';
+  };
 
   for (const line of projLines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*')) {
-      const bText = trimmed.replace(/^[•\-\*]\s*/, '').trim();
-      if (bText.length > 8) pBullets.push(bText);
+    // Bullet detection
+    if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('–')) {
+      const bText = trimmed.replace(/^[•\-\*–]\s*/, '').trim();
+      if (bText.length > 5) pBullets.push(bText);
       continue;
     }
 
+    // Continuation of previous bullet: if we have bullets and this line is a continuation
+    if (pBullets.length > 0 && (trimmed[0].toLowerCase() === trimmed[0] || !trimmed.includes('|') || trimmed.length > 85)) {
+      pBullets[pBullets.length - 1] = `${pBullets[pBullets.length - 1]} ${trimmed}`;
+      continue;
+    }
+
+    // Repo detection
     if (trimmed.includes('github.com') || trimmed.includes('http')) {
       const m = trimmed.match(/https?:\/\/[^\s]+/);
       if (m) pRepo = m[0];
     }
 
-    // Pure date check: NEVER a project title!
-    const isPureDate = /^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+)?(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current))?$/i.test(trimmed);
+    // Pure date check
+    const isPureDate = dateRegex.test(trimmed) && trimmed.length < 35;
     if (isPureDate) {
       pDate = trimmed;
       continue;
     }
 
-    if (trimmed.length < 120 && !trimmed.startsWith('•')) {
-      // Check for date at end of header
-      const dMatch = trimmed.match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current))?)\s*$/i);
-      let headerContent = trimmed;
-      if (dMatch) {
-        pDate = dMatch[1].trim();
-        headerContent = trimmed.substring(0, dMatch.index).trim();
+    // Project header detection (e.g. "HookRelay | Java, Spring Boot ... June 2026")
+    if (trimmed.includes('|') || trimmed.length < 80) {
+      const parts = trimmed.split(/[|]/).map(p => p.trim()).filter(Boolean);
+      const first = parts[0];
+      const rest = parts.slice(1);
+
+      const dMatch = trimmed.match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$/i);
+      const headerDate = dMatch ? dMatch[1].trim() : '';
+
+      const isFirstDate = dateRegex.test(first) && first.length < 30;
+      let headerTitle = '';
+      let headerTechs: string[] = [];
+
+      if (isFirstDate) {
+        headerTitle = '';
+        pDate = first;
+        headerTechs = rest.flatMap(p => p.split(',').map(t => t.trim()).filter(Boolean));
+      } else {
+        headerTitle = first;
+        if (headerDate) headerTitle = headerTitle.replace(headerDate, '').trim();
+        pDate = headerDate || pDate;
+        headerTechs = rest.flatMap(p => p.split(',').map(t => t.trim()).filter(Boolean));
       }
 
-      const parts = headerContent.split(/[|–\-:]/).map(p => p.trim()).filter(Boolean);
-      const cleanTitle = (parts[0] || '').replace(/[\u00a7\u2022\*\#\$\^\&]/g, '').trim();
-
-      if (cleanTitle && !/^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(?:19|20)\d{2}/i.test(cleanTitle)) {
-        if (pTitle && pBullets.length > 0) {
-          projects.push({
-            id: `proj-${projects.length + 1}`,
-            title: pTitle,
-            role: 'Developer',
-            start_date: pDate,
-            end_date: pDate,
-            summary: pBullets[0] || '',
-            technologies: pTechs.length > 0 ? pTechs : ['Java', 'Spring Boot', 'PostgreSQL', 'Docker'],
-            bullet_points: pBullets,
-            repo_url: pRepo,
-            is_verified: true
-          });
-          pBullets = [];
-          pRepo = '';
-        }
-        pTitle = cleanTitle;
-        pTechs = parts.length > 1 ? parts[1].split(',').map(t => t.trim()).filter(Boolean) : [];
+      if (pTitle || pBullets.length > 0) {
+        saveCurrentProj();
       }
+
+      pTitle = headerTitle;
+      pTechs = headerTechs;
     }
   }
-
-  if (pTitle && pBullets.length > 0) {
-    projects.push({
-      id: `proj-${projects.length + 1}`,
-      title: pTitle,
-      role: 'Developer',
-      start_date: pDate,
-      end_date: pDate,
-      summary: pBullets[0] || '',
-      technologies: pTechs.length > 0 ? pTechs : ['Java', 'Spring Boot', 'PostgreSQL', 'Docker'],
-      bullet_points: pBullets,
-      repo_url: pRepo,
-      is_verified: true
-    });
-  }
+  saveCurrentProj();
 
   // 9. Technical Skills
   const skillTaxonomy = [
     'Python', 'Java', 'C/C++', 'JavaScript', 'HTML', 'CSS', 'TypeScript', 'SQL',
-    'Spring Boot', 'React.js', 'React', 'REST APIs', 'Redis', 'Docker', 'LangChain', 'LangGraph', 'MCP', 'OpenAI Agent SDK',
-    'Generative AI', 'LLMs', 'AI Agents', 'Agentic Workflows', 'Model Context Protocol (MCP)', 'OpenAI Agents SDK', 'OpenAI Responses API',
-    'NumPy', 'Pandas', 'Matplotlib', 'Seaborn',
-    'MySQL', 'PostgreSQL', 'MongoDB', 'Oracle AI Vector Search',
-    'VS Code', 'IntelliJ IDEA', 'Jupyter Notebook', 'Google Colab', 'Git', 'Linux'
+    'Spring Boot', 'React.js', 'React', 'REST APIs', 'Redis', 'Docker', 'FastAPI', 'Django',
+    'NumPy', 'Pandas', 'Matplotlib', 'OpenCV', 'Dlib', 'Scikit-Learn', 'TensorFlow',
+    'MySQL', 'PostgreSQL', 'MongoDB', 'AWS', 'Git', 'Linux'
   ];
 
   const detectedSkillNames: string[] = [];
@@ -433,13 +469,13 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     }
   });
 
-  const skills: SkillItem[] = (detectedSkillNames.length > 0 ? detectedSkillNames : ['Java', 'Python', 'Spring Boot', 'SQL', 'Git']).map((name, idx) => ({
+  const skills: SkillItem[] = detectedSkillNames.map((name, idx) => ({
     id: `skill-${idx + 1}`,
     skill_name: name,
     category: ['Python', 'Java', 'C/C++', 'JavaScript', 'HTML', 'CSS', 'TypeScript', 'SQL'].includes(name) ? 'Programming Languages'
-      : ['VS Code', 'IntelliJ IDEA', 'Jupyter Notebook', 'Google Colab', 'Git', 'Linux'].includes(name) ? 'Development Tools'
-      : ['NumPy', 'Pandas', 'Matplotlib', 'Seaborn'].includes(name) ? 'Machine Learning & Data Analysis'
-      : ['MySQL', 'PostgreSQL', 'MongoDB', 'Oracle AI Vector Search'].includes(name) ? 'Databases'
+      : ['VS Code', 'Git', 'Linux', 'Docker', 'AWS'].includes(name) ? 'Development Tools'
+      : ['NumPy', 'Pandas', 'Matplotlib', 'OpenCV', 'Dlib', 'Scikit-Learn', 'TensorFlow'].includes(name) ? 'Machine Learning & Data Analysis'
+      : ['MySQL', 'PostgreSQL', 'MongoDB'].includes(name) ? 'Databases'
       : 'Technologies and Frameworks',
     proficiency_level: 'ADVANCED',
     years_experience: 2.0,
@@ -479,13 +515,13 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
       portfolioUrl: portfolio_url,
       leetcodeUrl: leetcode_url
     },
-    headline: `Software Engineer | ${skills[0]?.skill_name || 'Java & Spring Boot'}`,
-    educations: educations.length > 0 ? educations : SNEHIL_MASTER_RESUME.educations,
+    headline: `Software Engineer | ${skills[0]?.skill_name || 'Full Stack'}`,
+    educations: educations,
     experiences: [],
-    projects: projects.length > 0 ? projects : SNEHIL_MASTER_RESUME.projects,
-    skills: skills.length > 0 ? skills : SNEHIL_MASTER_RESUME.skills,
-    coursework: coursework.length > 0 ? coursework : SNEHIL_MASTER_RESUME.coursework,
-    involvements: involvements.length > 0 ? involvements : SNEHIL_MASTER_RESUME.involvements,
+    projects: projects,
+    skills: skills,
+    coursework: coursework,
+    involvements: involvements,
     section_order: ['education', 'projects', 'skills', 'coursework', 'involvement'],
     version_number: 1,
     versionNumber: 1,

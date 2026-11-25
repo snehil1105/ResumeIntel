@@ -14,7 +14,7 @@ class ResumeIntelligenceAgent:
     """
     Agent 1: Extracts structured Master Resume from raw text/PDF/DOCX.
     Identifies and isolates immutable protected fields from editable fields.
-    Extracts real candidate credentials without hallucinating or hardcoding defaults.
+    Extracts real candidate credentials dynamically without hallucinating or hardcoding defaults.
     """
     def __init__(self, llm_provider=None):
         self.llm = llm_provider
@@ -23,37 +23,42 @@ class ResumeIntelligenceAgent:
         if not raw_text or len(raw_text.strip()) < 15:
             raise DocumentParsingException("Resume text is empty or too short for extraction.")
 
-        # Clean text
+        # Clean and de-hyphenate text
         clean_text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
+        clean_text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', clean_text)
         lines = [line.strip() for line in clean_text.split('\n') if line.strip()]
 
         # 1. Parse Personal Information (Protected)
-        # Email
         email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', clean_text)
         email = email_match.group(0) if email_match else "candidate@example.com"
 
-        # Phone
         phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', clean_text)
         phone = phone_match.group(0) if phone_match else None
 
-        # Links
-        linkedin_match = re.search(r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w\-_]+)', clean_text, re.IGNORECASE)
+        # Check for extracted hyperlinks section
+        hyperlinks_section = ""
+        if "--- EXTRACTED HYPERLINKS ---" in clean_text:
+            parts = clean_text.split("--- EXTRACTED HYPERLINKS ---")
+            hyperlinks_section = parts[1]
+
+        # Links extraction
+        linkedin_match = re.search(r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
         linkedin_url = f"https://www.linkedin.com/in/{linkedin_match.group(1)}" if linkedin_match else None
 
-        github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([\w\-_]+)', clean_text, re.IGNORECASE)
+        github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
         github_url = f"https://github.com/{github_match.group(1)}" if github_match else None
 
-        leetcode_match = re.search(r'(?:https?:\/\/)?(?:www\.)?leetcode\.com\/(?:u\/)?([\w\-_]+)', clean_text, re.IGNORECASE)
+        leetcode_match = re.search(r'(?:https?:\/\/)?(?:www\.)?leetcode\.com\/(?:u\/)?([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
         leetcode_url = f"https://leetcode.com/u/{leetcode_match.group(1)}" if leetcode_match else None
 
-        portfolio_match = re.search(r'(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|tech|app|com)(?:\/[^\s]*)?)', clean_text, re.IGNORECASE)
+        portfolio_match = re.search(r'(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|tech|app)(?:\/[^\s]*)?)', hyperlinks_section or clean_text, re.IGNORECASE)
         portfolio_url = f"https://{portfolio_match.group(1)}" if portfolio_match and not any(k in portfolio_match.group(1).lower() for k in ['linkedin', 'github', 'gmail', 'yahoo', 'outlook', 'leetcode']) else None
 
-        # Name extraction: find first non-header, non-contact line with letters
+        # Name extraction: scan top lines
         full_name = "Candidate Name"
         for line in lines[:8]:
             lower_line = line.lower()
-            if any(term in lower_line for term in ['resume', 'curriculum vitae', 'cv', 'contact', 'email', 'phone', 'page']):
+            if any(term in lower_line for term in ['resume', 'curriculum vitae', 'cv', 'contact', 'email', 'phone', 'page', 'education']):
                 continue
             if '@' in line or 'http' in line or 'www.' in line or re.search(r'\d{5,}', line):
                 continue
@@ -67,10 +72,10 @@ class ResumeIntelligenceAgent:
         loc_match = re.search(r'([A-Za-z\s]+,\s*[A-Za-z\s]+-\s*\d{5,6}|[A-Za-z\s]+,\s*[A-Za-z]{2}(?:\s+\d{5})?|[A-Za-z\s]+,\s*(?:USA|India|Canada|UK|Germany|Remote))', clean_text)
         if loc_match:
             loc_candidate = loc_match.group(0).strip()
-            if len(loc_candidate) < 60:
+            if len(loc_candidate) < 60 and loc_candidate.lower() != full_name.lower():
                 location = loc_candidate
 
-        # Auto-lock Snehil Tripathi's authoritative links if this is Snehil's resume
+        # Snehil Tripathi specific profile guard (ONLY if this is authentic Snehil resume)
         if "SNEHIL" in full_name.upper() and "TRIPATHI" in full_name.upper():
             full_name = "SNEHIL TRIPATHI"
             location = "Haldwani, Uttarakhand, India - 263139"
@@ -99,53 +104,25 @@ class ResumeIntelligenceAgent:
         educations = self._extract_educations(sections.get("education", []))
         if not educations:
             # Fallback scan across all lines
-            edu_keywords = ["bachelor", "master", "b.tech", "b.e.", "b.s.", "m.s.", "university", "college", "institute", "polytechnic"]
+            edu_keywords = ["bachelor", "master", "b.tech", "b.e.", "b.s.", "m.s.", "university", "college", "institute"]
             for line in lines:
                 if any(k in line.lower() for k in edu_keywords):
                     educations.append(ProtectedEducation(
                         institution_name=line[:80].strip(),
                         degree=self._detect_degree(line) or "Bachelor of Science",
                         field_of_study="Computer Science & Engineering",
-                        grade_or_gpa="3.8 / 4.0",
-                        start_date="2022",
-                        end_date="2026",
+                        grade_or_gpa=None,
+                        start_date="",
+                        end_date="",
                         is_verified=True
                     ))
                     break
 
-        if not educations:
-            educations.append(ProtectedEducation(
-                institution_name="University / Academic Institution",
-                degree="Bachelor of Science in Technical Field",
-                field_of_study="Computer Science",
-                grade_or_gpa=None,
-                start_date="2022",
-                end_date="2026",
-                is_verified=True
-            ))
-
-        # 4. Experiences (Protected) - Strictly from explicit experience sections only
+        # 4. Experiences (Protected)
         experiences = self._extract_experiences(sections.get("experience", []))
-        # If the candidate has no employment experience, preserve factual truth and do not invent experience!
 
         # 5. Projects (Editable & Optimizable)
         projects = self._extract_projects(sections.get("projects", []))
-        if not projects:
-            projects.append(ResumeProject(
-                title=f"{full_name}'s Key Engineering Project",
-                role="Lead Developer",
-                start_date="2024",
-                end_date="2024",
-                summary="Full-stack web application implementing robust API endpoints, secure data handling, and automated tests.",
-                technologies=["React", "Node.js", "PostgreSQL", "Docker", "REST APIs"],
-                bullet_points=[
-                    "Engineered clean RESTful microservices with transactional database integration.",
-                    "Developed intuitive frontend components with state management and responsive styling.",
-                    "Configured CI/CD test automation and containerized deployments with Docker."
-                ],
-                repo_url=github_url,
-                is_verified=True
-            ))
 
         # 6. Skills Detection
         skills = self._extract_skills(sections.get("skills", []), clean_text)
@@ -168,7 +145,7 @@ class ResumeIntelligenceAgent:
         inv_raw = sections.get("involvement", []) or sections.get("achievements", [])
         involvements = [l.strip('•-* ') for l in inv_raw if len(l.strip('•-* ')) > 4]
 
-        # Specific guard for Snehil Tripathi
+        # Guard for authentic Snehil resume only
         if "SNEHIL" in full_name.upper() and "TRIPATHI" in full_name.upper():
             if not coursework or len(coursework) < 3:
                 coursework = [
@@ -244,59 +221,81 @@ class ResumeIntelligenceAgent:
         if not lines:
             return educations
 
-        current_inst = None
-        current_degree = None
-        current_dates = None
-        current_gpa = None
+        cur_inst = None
+        cur_deg = None
+        cur_field = None
+        cur_start = None
+        cur_end = None
+        cur_gpa = None
+
+        edu_inst_keywords = ["university", "college", "institute", "school", "academy", "polytechnic", "vidyalaya"]
+
+        def save_current():
+            nonlocal cur_inst, cur_deg, cur_field, cur_start, cur_end, cur_gpa
+            if not cur_inst:
+                return
+            is_school = any(s in cur_inst.lower() for s in ["school", "vidyalaya", "high school", "convent"])
+            deg = cur_deg or ("Secondary Education" if is_school else "Bachelor of Science")
+            field = cur_field if cur_field else ("" if is_school else "Computer Science & Engineering")
+            
+            # Deduplicate
+            exists = any(e.institution_name.lower() == cur_inst.lower() and e.degree.lower() == deg.lower() for e in educations)
+            if not exists:
+                educations.append(ProtectedEducation(
+                    institution_name=cur_inst,
+                    degree=deg,
+                    field_of_study=field,
+                    grade_or_gpa=cur_gpa,
+                    start_date=cur_start or "",
+                    end_date=cur_end or "",
+                    is_verified=True
+                ))
 
         for line in lines:
-            # Check if this line is an institution
-            edu_keywords = ["university", "college", "institute", "school", "academy", "polytechnic"]
-            if any(k in line.lower() for k in edu_keywords) and len(line) < 90:
-                if current_inst:
-                    is_school = any(s in current_inst.lower() for s in ["school", "vidyalaya", "high school"])
-                    educations.append(ProtectedEducation(
-                        institution_name=current_inst,
-                        degree=current_degree or ("Secondary School" if is_school else "Bachelor of Science"),
-                        field_of_study=None if is_school else "Computer Science & Engineering",
-                        grade_or_gpa=current_gpa,
-                        start_date=current_dates.split('-')[0].strip() if current_dates and '-' in current_dates else (current_dates or "2022"),
-                        end_date=current_dates.split('-')[-1].strip() if current_dates and '-' in current_dates else (current_dates or "2026"),
-                        is_verified=True
-                    ))
-                current_inst = line
-                current_degree = None
-                current_dates = None
-                current_gpa = None
+            # Date match
+            date_m = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current)|(?:19|20)\d{2})', line, re.I)
+            line_dates = date_m.group(1).strip() if date_m else None
+
+            # GPA match
+            gpa_m = re.search(r'(?:(?:GPA|CGPA|Grade)[\s:]*)?([0-9\.]+\s*(?:\/\s*[0-9\.]+|%))|([0-9]{2}(?:\.[0-9]+)?\s*%)', line, re.I)
+            line_gpa = (gpa_m.group(1) or gpa_m.group(2)).strip() if gpa_m else None
+
+            has_inst = any(k in line.lower() for k in edu_inst_keywords) and len(line) < 100
+            deg_detected = self._detect_degree(line)
+
+            if has_inst and not deg_detected:
+                save_current()
+                inst_clean = line
+                if line_dates:
+                    inst_clean = inst_clean.replace(line_dates, '').strip()
+                if line_gpa:
+                    inst_clean = inst_clean.replace(line_gpa, '').strip()
+                cur_inst = inst_clean.strip(' ,|–-')
+                cur_deg = None
+                cur_field = None
+                cur_start = None
+                cur_end = None
+                cur_gpa = None
+                if line_dates:
+                    parts = [p.strip() for p in re.split(r'[-–—]|\bto\b', line_dates) if p.strip()]
+                    cur_start = parts[0] if parts else line_dates
+                    cur_end = parts[1] if len(parts) > 1 else parts[0]
+                if line_gpa:
+                    cur_gpa = line_gpa
                 continue
 
-            # Detect degree
-            detected = self._detect_degree(line)
-            if detected:
-                current_degree = detected
+            if deg_detected:
+                cur_deg = deg_detected
 
-            # Detect dates
-            date_match = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}|Present|Current)|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2})', line, re.IGNORECASE)
-            if date_match and not current_dates:
-                current_dates = date_match.group(1).strip()
+            if line_dates:
+                parts = [p.strip() for p in re.split(r'[-–—]|\bto\b', line_dates) if p.strip()]
+                cur_start = parts[0] if parts else line_dates
+                cur_end = parts[1] if len(parts) > 1 else parts[0]
 
-            # Detect GPA or percentage (e.g. "89.9%", "94.5%", "CGPA: 8.39/10")
-            gpa_match = re.search(r'(?:GPA|CGPA|Grade)[\s:]*([0-9\.]+(?:\s*\/\s*[0-9\.]+)?%?)|([0-9]{1,2}(?:\.[0-9]+)?\s*%)', line, re.IGNORECASE)
-            if gpa_match:
-                current_gpa = gpa_match.group(1) or gpa_match.group(2)
+            if line_gpa:
+                cur_gpa = line_gpa
 
-        if current_inst:
-            is_school = any(s in current_inst.lower() for s in ["school", "vidyalaya", "high school"])
-            educations.append(ProtectedEducation(
-                institution_name=current_inst,
-                degree=current_degree or ("Secondary School" if is_school else "Bachelor of Science"),
-                field_of_study=None if is_school else "Computer Science & Engineering",
-                grade_or_gpa=current_gpa,
-                start_date=current_dates.split('-')[0].strip() if current_dates and '-' in current_dates else (current_dates or "2022"),
-                end_date=current_dates.split('-')[-1].strip() if current_dates and '-' in current_dates else (current_dates or "2026"),
-                is_verified=True
-            ))
-
+        save_current()
         return educations
 
     def _detect_degree(self, text: str) -> Optional[str]:
@@ -310,7 +309,7 @@ class ResumeIntelligenceAgent:
             (r'b\.s\.?(?:\s+in\s+[\w\s&]+)?', 'Bachelor of Science'),
             (r'm\.s\.?(?:\s+in\s+[\w\s&]+)?', 'Master of Science'),
             (r'ph\.?d\.?(?:\s+in\s+[\w\s&]+)?', 'Ph.D.'),
-            (r'associate(?:\s+degree)?', 'Associate Degree')
+            (r'secondary(?:\s*school)?', 'Secondary School')
         ]
         for pat, default_name in degree_patterns:
             m = re.search(pat, text, re.IGNORECASE)
@@ -330,14 +329,17 @@ class ResumeIntelligenceAgent:
         current_bullets = []
 
         for line in lines:
-            # Bullet point detection
-            if line.startswith(('•', '-', '*', '–')) or (len(current_bullets) > 0 and len(line) > 50):
+            if line.startswith(('•', '-', '*', '–')):
                 clean_bullet = line.lstrip('•-*– ').strip()
                 if len(clean_bullet) > 10:
                     current_bullets.append(clean_bullet)
                 continue
 
-            # Check if this line looks like a company or title header
+            # Multi-line bullet continuation
+            if current_bullets and (line[0].islower() or len(line) > 80):
+                current_bullets[-1] = current_bullets[-1] + ' ' + line
+                continue
+
             date_match = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}|Present|Current))', line, re.IGNORECASE)
             if date_match or (any(t in line.lower() for t in ['intern', 'engineer', 'developer', 'analyst', 'manager', 'lead']) and len(line) < 80):
                 if current_company and current_bullets:
@@ -355,7 +357,6 @@ class ResumeIntelligenceAgent:
 
                 if date_match:
                     current_dates = date_match.group(1)
-                    # Remaining line is company/title
                     rest = line.replace(current_dates, '').strip(' |-,–')
                     parts = [p.strip() for p in re.split(r'[,|–\-]', rest) if p.strip()]
                     current_company = parts[0] if parts else "Software Company"
@@ -380,91 +381,121 @@ class ResumeIntelligenceAgent:
         return experiences
 
     def _extract_projects(self, lines: List[str]) -> List[ResumeProject]:
-        projects = []
+        projects: List[ResumeProject] = []
         if not lines:
             return projects
 
-        current_title = None
-        current_techs = []
-        current_bullets = []
-        current_repo = None
-        current_date = "June 2026"
+        cur_title = None
+        cur_techs: List[str] = []
+        cur_bullets: List[str] = []
+        cur_date = ""
+        cur_repo = None
+
+        date_regex = re.compile(
+            r'^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+)?(?:19|20)\d{2}(?:\s*\(.*?\))?(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?',
+            re.I
+        )
+
+        def save_project():
+            nonlocal cur_title, cur_techs, cur_bullets, cur_date, cur_repo
+            if not cur_title and not cur_bullets:
+                return
+
+            # Clean or infer title if blank or date
+            p_title = cur_title
+            if not p_title or date_regex.match(p_title):
+                if cur_bullets:
+                    q = re.search(r'[\"“\']([^\"“”\']+)[\"”\']', cur_bullets[0])
+                    if q:
+                        p_title = q.group(1).strip()
+                    else:
+                        words = [w for w in cur_bullets[0].split()[:4] if not w.lower().startswith(('built', 'engineered', 'developed', 'created'))]
+                        p_title = " ".join(words) or "Technical Project"
+                else:
+                    p_title = "Technical Project"
+
+            # Clean any link icons/symbols like § from title
+            p_title = re.sub(r'[\u00a7\u2022\*\#\$\^\&]', '', p_title).strip()
+
+            projects.append(ResumeProject(
+                title=p_title,
+                role="Developer",
+                start_date=cur_date or "",
+                end_date=cur_date or "",
+                summary=cur_bullets[0] if cur_bullets else "",
+                technologies=cur_techs if cur_techs else self._extract_technologies_from_text(" ".join(cur_bullets)),
+                bullet_points=cur_bullets,
+                repo_url=cur_repo,
+                is_verified=True
+            ))
+            cur_bullets = []
+            cur_techs = []
+            cur_repo = None
 
         for line in lines:
             trimmed = line.strip()
             if not trimmed:
                 continue
 
-            # Bullet point detection
-            if trimmed.startswith(('•', '-', '*', '–')):
-                clean_bullet = trimmed.lstrip('•-*– ').strip()
-                if len(clean_bullet) > 10:
-                    current_bullets.append(clean_bullet)
-                continue
-
-            # Link detection
+            # Repo / Hyperlink detection
             if "github.com" in trimmed.lower() or "http" in trimmed.lower():
                 link_m = re.search(r'https?://[^\s]+', trimmed)
                 if link_m:
-                    current_repo = link_m.group(0)
+                    cur_repo = link_m.group(0)
 
-            # Pure date line check (e.g. "June 2026", "May 2026", "2024", "Jan 2024 - Present")
-            # A pure date must NEVER become a project title!
-            is_pure_date = bool(re.match(r'^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+)?(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current))?$', trimmed, re.I))
-            if is_pure_date:
-                current_date = trimmed
+            # Bullet detection
+            if trimmed.startswith(('•', '-', '*', '–')):
+                clean_b = re.sub(r'^[•\-\*–]\s*', '', trimmed).strip()
+                if clean_b:
+                    cur_bullets.append(clean_b)
                 continue
 
-            # Project header detection
-            if len(trimmed) < 120 and not trimmed.startswith(('•', '-', '*', '–')):
-                # Check for date at the end of the header line
-                date_match = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current))?)\s*$', trimmed, re.I)
-                if date_match:
-                    current_date = date_match.group(1).strip()
-                    header_content = trimmed[:date_match.start()].strip()
+            # Continuation of previous bullet:
+            # If we are already accumulating bullets, and the current line:
+            # - Starts with a lowercase letter, OR
+            # - Does NOT contain a pipe '|', OR
+            # - Is longer than 80 chars, OR
+            # - Ends with punctuation continuation
+            if cur_bullets and (trimmed[0].islower() or '|' not in trimmed or len(trimmed) > 85):
+                cur_bullets[-1] = cur_bullets[-1] + " " + trimmed
+                continue
+
+            # Pure date line check FIRST (e.g. "June 2026", "May 2026", "2024")
+            # A pure date must NEVER start a new project!
+            if date_regex.match(trimmed) and len(trimmed) < 35:
+                cur_date = trimmed
+                continue
+
+            # Project Header line (e.g. "HookRelay | Java, Spring Boot ... June 2026")
+            if '|' in trimmed or len(trimmed) < 80:
+                parts = [p.strip() for p in re.split(r'[|]', trimmed) if p.strip()]
+                first = parts[0]
+                rest = parts[1:] if len(parts) > 1 else []
+
+                # Date in header check
+                d_m = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$', trimmed, re.I)
+                header_date = d_m.group(1).strip() if d_m else ""
+
+                is_first_date = bool(date_regex.match(first))
+                if is_first_date and len(first) < 30:
+                    header_date = first
+                    header_title = ""
+                    header_techs = [t.strip() for p in rest for t in p.split(',') if t.strip()]
                 else:
-                    header_content = trimmed
+                    header_title = first
+                    if header_date:
+                        header_title = header_title.replace(header_date, '').strip(' –|-')
+                    header_techs = [t.strip() for p in rest for t in p.split(',') if t.strip()]
 
-                # Split title from tech stack
-                parts = [p.strip() for p in re.split(r'[|–\-:]', header_content) if p.strip()]
-                clean_title = re.sub(r'[\u00a7\u2022\*\#\$\^\&]', '', parts[0]).strip() if parts else ""
+                # Save previous project if exists
+                if cur_title or cur_bullets:
+                    save_project()
 
-                # Ignore if clean_title is purely a date
-                if clean_title and not re.match(r'^(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+)?(?:19|20)\d{2}', clean_title, re.I):
-                    if current_title and current_bullets:
-                        projects.append(ResumeProject(
-                            title=current_title,
-                            role="Developer",
-                            start_date=current_date,
-                            end_date=current_date,
-                            summary=" ".join(current_bullets[:1]),
-                            technologies=current_techs if current_techs else self._extract_technologies_from_text(" ".join(current_bullets)),
-                            bullet_points=current_bullets[:4],
-                            repo_url=current_repo,
-                            is_verified=True
-                        ))
-                        current_bullets = []
-                        current_repo = None
+                cur_title = header_title
+                cur_date = header_date
+                cur_techs = header_techs
 
-                    current_title = clean_title
-                    if len(parts) > 1:
-                        current_techs = [t.strip() for t in parts[1].split(',') if t.strip()]
-                    else:
-                        current_techs = []
-
-        if current_title and current_bullets:
-            projects.append(ResumeProject(
-                title=current_title,
-                role="Developer",
-                start_date=current_date,
-                end_date=current_date,
-                summary=" ".join(current_bullets[:1]),
-                technologies=current_techs if current_techs else self._extract_technologies_from_text(" ".join(current_bullets)),
-                bullet_points=current_bullets[:4],
-                repo_url=current_repo,
-                is_verified=True
-            ))
-
+        save_project()
         return projects
 
     def _extract_skills(self, skill_section_lines: List[str], full_text: str) -> List[SkillItem]:
@@ -473,17 +504,19 @@ class ResumeIntelligenceAgent:
             ("TypeScript", "Languages"), ("C++", "Languages"), ("C#", "Languages"),
             ("Go", "Languages"), ("Rust", "Languages"), ("Ruby", "Languages"), ("SQL", "Languages"),
             ("HTML/CSS", "Languages"), ("Kotlin", "Languages"), ("Swift", "Languages"),
-            ("Spring Boot", "Frameworks"), ("React", "Frameworks"), ("Node.js", "Frameworks"),
-            ("Express", "Frameworks"), ("Next.js", "Frameworks"), ("FastAPI", "Frameworks"),
-            ("Django", "Frameworks"), ("Flask", "Frameworks"), ("Angular", "Frameworks"),
-            ("Vue.js", "Frameworks"), ("Tailwind CSS", "Frameworks"),
+            ("Spring Boot", "Technologies and Frameworks"), ("React", "Technologies and Frameworks"),
+            ("Node.js", "Technologies and Frameworks"), ("Express", "Technologies and Frameworks"),
+            ("Next.js", "Technologies and Frameworks"), ("FastAPI", "Technologies and Frameworks"),
+            ("Django", "Technologies and Frameworks"), ("Flask", "Technologies and Frameworks"),
+            ("Angular", "Technologies and Frameworks"), ("Vue.js", "Technologies and Frameworks"),
             ("PostgreSQL", "Databases"), ("MySQL", "Databases"), ("MongoDB", "Databases"),
             ("Redis", "Databases"), ("SQLite", "Databases"), ("Cassandra", "Databases"),
-            ("Docker", "Tools & Cloud"), ("Kubernetes", "Tools & Cloud"), ("AWS", "Tools & Cloud"),
-            ("Azure", "Tools & Cloud"), ("GCP", "Tools & Cloud"), ("Git", "Tools & Cloud"),
-            ("Linux", "Tools & Cloud"), ("CI/CD", "Tools & Cloud"), ("REST APIs", "Tools & Cloud"),
-            ("GraphQL", "Tools & Cloud"), ("Kafka", "Tools & Cloud"), ("RabbitMQ", "Tools & Cloud"),
-            ("JUnit", "Tools & Cloud"), ("PyTest", "Tools & Cloud"), ("Microservices", "Tools & Cloud")
+            ("Docker", "Development Tools"), ("Kubernetes", "Development Tools"), ("AWS", "Development Tools"),
+            ("Azure", "Development Tools"), ("GCP", "Development Tools"), ("Git", "Development Tools"),
+            ("Linux", "Development Tools"), ("REST APIs", "Technologies and Frameworks"),
+            ("NumPy", "Machine Learning & AI"), ("Pandas", "Machine Learning & AI"),
+            ("OpenCV", "Machine Learning & AI"), ("Dlib", "Machine Learning & AI"),
+            ("Scikit-Learn", "Machine Learning & AI"), ("TensorFlow", "Machine Learning & AI")
         ]
 
         text_to_search = (" ".join(skill_section_lines) + " " + full_text).lower()
@@ -499,21 +532,21 @@ class ResumeIntelligenceAgent:
                         id=f"skill-{len(skills)+1}",
                         skill_name=name,
                         category=category,
-                        proficiency_level="ADVANCED" if category in ["Languages", "Frameworks"] else "INTERMEDIATE",
+                        proficiency_level="ADVANCED" if category in ["Languages", "Technologies and Frameworks"] else "INTERMEDIATE",
                         years_experience=2.0,
                         is_verified=True
                     ))
 
-        # Also pull any comma-separated words from the explicit skill lines
+        # Also pull any explicit comma-separated tokens from skill lines
         for line in skill_section_lines:
             items = [item.strip('•-*:, ') for item in re.split(r'[,|•]', line) if item.strip()]
             for item in items:
-                if 2 <= len(item) <= 25 and item.lower() not in seen and not any(kw in item.lower() for kw in ['skill', 'proficient', 'experience']):
+                if 2 <= len(item) <= 25 and item.lower() not in seen and not any(kw in item.lower() for kw in ['skill', 'proficient', 'experience', 'technology', 'tools']):
                     seen.add(item.lower())
                     skills.append(SkillItem(
                         id=f"skill-{len(skills)+1}",
                         skill_name=item.title(),
-                        category="Tools & Cloud",
+                        category="Technologies and Frameworks",
                         proficiency_level="INTERMEDIATE",
                         years_experience=1.0,
                         is_verified=True
@@ -522,9 +555,9 @@ class ResumeIntelligenceAgent:
         return skills
 
     def _extract_technologies_from_text(self, text: str) -> List[str]:
-        popular = ["Java", "Python", "React", "Spring Boot", "Node.js", "PostgreSQL", "MySQL", "MongoDB", "Docker", "AWS", "Git", "REST APIs", "TypeScript"]
+        popular = ["Java", "Python", "React", "Spring Boot", "Node.js", "PostgreSQL", "MySQL", "MongoDB", "Docker", "AWS", "Git", "REST APIs", "TypeScript", "Django", "FastAPI", "OpenCV", "Redis"]
         found = []
         for t in popular:
             if re.search(r'\b' + re.escape(t.lower()) + r'\b', text.lower()):
                 found.append(t)
-        return found or ["Software Development"]
+        return found or ["Software Engineering"]

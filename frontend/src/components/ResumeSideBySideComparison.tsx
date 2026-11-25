@@ -125,14 +125,38 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                 {mInfo.phone && <span>{mInfo.phone}</span>}
                 {mInfo.phone && mInfo.email && <span className="text-gray-400">|</span>}
                 {mInfo.email && <span>{mInfo.email}</span>}
-                <span className="text-gray-400">|</span>
-                <span className="text-blue-800">LinkedIn</span>
-                <span className="text-gray-400">|</span>
-                <span>GitHub</span>
-                <span className="text-gray-400">|</span>
-                <span>Portfolio</span>
-                <span className="text-gray-400">|</span>
-                <span>LeetCode</span>
+                {mInfo.linkedin_url && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <a href={mInfo.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-blue-800 hover:underline">
+                      LinkedIn
+                    </a>
+                  </>
+                )}
+                {mInfo.github_url && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <a href={mInfo.github_url} target="_blank" rel="noopener noreferrer" className="text-blue-800 hover:underline">
+                      GitHub
+                    </a>
+                  </>
+                )}
+                {mInfo.portfolio_url && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <a href={mInfo.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-blue-800 hover:underline">
+                      Portfolio
+                    </a>
+                  </>
+                )}
+                {mInfo.leetcode_url && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <a href={mInfo.leetcode_url} target="_blank" rel="noopener noreferrer" className="text-blue-800 hover:underline">
+                      LeetCode
+                    </a>
+                  </>
+                )}
               </div>
             </div>
 
@@ -179,7 +203,7 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                       </span>
                     </div>
                     <span className="text-[8.5pt] text-gray-600 italic whitespace-nowrap ml-2">
-                      {proj.end_date || 'June 2026'}
+                      {proj.end_date || proj.start_date || ''}
                     </span>
                   </div>
                   <ul className="list-disc list-outside ml-4 space-y-0.5 text-[8.5pt] text-gray-800 leading-snug">
@@ -258,42 +282,36 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
             </div>
 
             {/* 4. Coursework & Certifications (Fourth) */}
-            <div className="space-y-1">
-              <div className="border-b-[1.2px] border-black pb-0.5 mb-1.5">
-                <h2 className="text-[11pt] font-bold uppercase tracking-wide font-serif text-black">
-                  Coursework &amp; Certifications
-                </h2>
+            {((masterResume.coursework && masterResume.coursework.length > 0) || (masterResume.certifications && masterResume.certifications.length > 0)) && (
+              <div className="space-y-1">
+                <div className="border-b-[1.2px] border-black pb-0.5 mb-1.5">
+                  <h2 className="text-[11pt] font-bold uppercase tracking-wide font-serif text-black">
+                    Coursework &amp; Certifications
+                  </h2>
+                </div>
+                <div className="text-[8.5pt] text-gray-900 space-y-0.5">
+                  {(masterResume.coursework && masterResume.coursework.length > 0 ? masterResume.coursework : (masterResume.certifications || [])).map((cw, idx) => (
+                    <div key={idx}>{cw}</div>
+                  ))}
+                </div>
               </div>
-              <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {((masterResume.coursework && masterResume.coursework.length > 0) ? masterResume.coursework : (masterResume.certifications && masterResume.certifications.length > 0 ? masterResume.certifications : [
-                  "Internet of Things (IoT): IIT Kharagpur / NPTEL",
-                  "Agentic AI Certified Foundations Associate: Oracle University",
-                  "IBM AI Engineering Professional Certificate: Coursera",
-                  "Cloud Computing: IIT Kharagpur / NPTEL",
-                  "Marketing Analysis: IIT Kharagpur / NPTEL",
-                  "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-                ])).map((cw, idx) => (
-                  <div key={idx}>{cw}</div>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* 5. Involvement (Fifth) */}
-            <div className="space-y-1">
-              <div className="border-b-[1.2px] border-black pb-0.5 mb-1.5">
-                <h2 className="text-[11pt] font-bold uppercase tracking-wide font-serif text-black">
-                  Involvement
-                </h2>
+            {((masterResume.involvements && masterResume.involvements.length > 0) || (masterResume.achievements && masterResume.achievements.length > 0)) && (
+              <div className="space-y-1">
+                <div className="border-b-[1.2px] border-black pb-0.5 mb-1.5">
+                  <h2 className="text-[11pt] font-bold uppercase tracking-wide font-serif text-black">
+                    Involvement
+                  </h2>
+                </div>
+                <div className="text-[8.5pt] text-gray-900 space-y-0.5">
+                  {(masterResume.involvements && masterResume.involvements.length > 0 ? masterResume.involvements : (masterResume.achievements || [])).map((inv, idx) => (
+                    <div key={idx}>{inv}</div>
+                  ))}
+                </div>
               </div>
-              <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {((masterResume.involvements && masterResume.involvements.length > 0) ? masterResume.involvements : (masterResume.achievements && masterResume.achievements.length > 0 ? masterResume.achievements : [
-                  "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
-                  "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
-                ])).map((inv, idx) => (
-                  <div key={idx}>{inv}</div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -466,7 +484,7 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
                         )}
                       </div>
                       <span className="text-[8.5pt] text-gray-700 italic whitespace-nowrap ml-2">
-                        {proj.end_date || 'June 2026'}
+                        {proj.end_date || proj.start_date || ''}
                       </span>
                     </div>
                     <ul className="list-disc list-outside ml-4 space-y-0.5 text-[8.5pt] text-gray-900 leading-snug">
@@ -555,56 +573,50 @@ export const ResumeSideBySideComparison: React.FC<ResumeSideBySideComparisonProp
             </div>
 
             {/* 4. Coursework & Certifications (Fourth) */}
-            <div className="space-y-1">
-              <div 
-                style={{ borderBottomColor: accentColor }}
-                className="border-b-[1.2px] pb-0.5 mb-1.5 flex items-center justify-between"
-              >
-                <h2 
-                  style={{ color: accentColor }}
-                  className="text-[11pt] font-bold uppercase tracking-wide font-serif"
+            {((tailoredResume.coursework && tailoredResume.coursework.length > 0) || (tailoredResume.certifications && tailoredResume.certifications.length > 0)) && (
+              <div className="space-y-1">
+                <div 
+                  style={{ borderBottomColor: accentColor }}
+                  className="border-b-[1.2px] pb-0.5 mb-1.5 flex items-center justify-between"
                 >
-                  Coursework &amp; Certifications
-                </h2>
-                <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
+                  <h2 
+                    style={{ color: accentColor }}
+                    className="text-[11pt] font-bold uppercase tracking-wide font-serif"
+                  >
+                    Coursework &amp; Certifications
+                  </h2>
+                  <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
+                </div>
+                <div className="text-[8.5pt] text-gray-900 space-y-0.5">
+                  {(tailoredResume.coursework && tailoredResume.coursework.length > 0 ? tailoredResume.coursework : (tailoredResume.certifications || [])).map((cw, idx) => (
+                    <div key={idx}>{cw}</div>
+                  ))}
+                </div>
               </div>
-              <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {((tailoredResume.coursework && tailoredResume.coursework.length > 0) ? tailoredResume.coursework : (tailoredResume.certifications && tailoredResume.certifications.length > 0 ? tailoredResume.certifications : [
-                  "Internet of Things (IoT): IIT Kharagpur / NPTEL",
-                  "Agentic AI Certified Foundations Associate: Oracle University",
-                  "IBM AI Engineering Professional Certificate: Coursera",
-                  "Cloud Computing: IIT Kharagpur / NPTEL",
-                  "Marketing Analysis: IIT Kharagpur / NPTEL",
-                  "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-                ])).map((cw, idx) => (
-                  <div key={idx}>{cw}</div>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* 5. Involvement (Fifth) */}
-            <div className="space-y-1">
-              <div 
-                style={{ borderBottomColor: accentColor }}
-                className="border-b-[1.2px] pb-0.5 mb-1.5 flex items-center justify-between"
-              >
-                <h2 
-                  style={{ color: accentColor }}
-                  className="text-[11pt] font-bold uppercase tracking-wide font-serif"
+            {((tailoredResume.involvements && tailoredResume.involvements.length > 0) || (tailoredResume.achievements && tailoredResume.achievements.length > 0)) && (
+              <div className="space-y-1">
+                <div 
+                  style={{ borderBottomColor: accentColor }}
+                  className="border-b-[1.2px] pb-0.5 mb-1.5 flex items-center justify-between"
                 >
-                  Involvement
-                </h2>
-                <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
+                  <h2 
+                    style={{ color: accentColor }}
+                    className="text-[11pt] font-bold uppercase tracking-wide font-serif"
+                  >
+                    Involvement
+                  </h2>
+                  <span className="text-[8pt] text-gray-500 font-sans italic">Verified</span>
+                </div>
+                <div className="text-[8.5pt] text-gray-900 space-y-0.5">
+                  {(tailoredResume.involvements && tailoredResume.involvements.length > 0 ? tailoredResume.involvements : (tailoredResume.achievements || [])).map((inv, idx) => (
+                    <div key={idx}>{inv}</div>
+                  ))}
+                </div>
               </div>
-              <div className="text-[8.5pt] text-gray-900 space-y-0.5">
-                {((tailoredResume.involvements && tailoredResume.involvements.length > 0) ? tailoredResume.involvements : (tailoredResume.achievements && tailoredResume.achievements.length > 0 ? tailoredResume.achievements : [
-                  "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
-                  "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
-                ])).map((inv, idx) => (
-                  <div key={idx}>{inv}</div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

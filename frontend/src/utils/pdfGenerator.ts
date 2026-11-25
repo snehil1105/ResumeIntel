@@ -50,27 +50,29 @@ export function downloadResumeAsPDF(
   doc.setFont('times', 'bold');
   doc.setFontSize(19);
   doc.setTextColor(15, 23, 42);
-  const fullName = (pInfo.full_name || pInfo.fullName || 'SNEHIL TRIPATHI').toUpperCase();
+  const fullName = (pInfo.full_name || pInfo.fullName || 'Candidate Name').toUpperCase();
   doc.text(fullName, pageWidth / 2, y, { align: 'center' });
   y += 14;
 
   // 2. Location (Guard: Never duplicate candidate name)
   const loc = (pInfo.location && pInfo.location.toLowerCase() !== fullName.toLowerCase())
     ? pInfo.location
-    : 'Haldwani, Uttarakhand, India - 263139';
-  doc.setFont('times', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
-  doc.text(loc, pageWidth / 2, y, { align: 'center' });
-  y += 12;
+    : '';
+  if (loc) {
+    doc.setFont('times', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(loc, pageWidth / 2, y, { align: 'center' });
+    y += 12;
+  }
 
   // 3. Contact Line with Active Clickable Links
-  const phone = pInfo.phone || '+91-7900609557';
-  const email = pInfo.email || 'tripatics11@gmail.com';
-  const linkedin = pInfo.linkedin_url || pInfo.linkedinUrl || 'https://linkedin.com/in/snehil-tripathi-38031131a';
-  const github = pInfo.github_url || pInfo.githubUrl || 'https://github.com/snehil1105';
-  const portfolio = pInfo.portfolio_url || pInfo.portfolioUrl || 'https://snehil-portfolio-eosin.vercel.app/';
-  const leetcode = pInfo.leetcode_url || pInfo.leetcodeUrl || 'https://leetcode.com/u/Snehiltripathi05/';
+  const phone = pInfo.phone || '';
+  const email = pInfo.email || '';
+  const linkedin = pInfo.linkedin_url || pInfo.linkedinUrl || '';
+  const github = pInfo.github_url || pInfo.githubUrl || '';
+  const portfolio = pInfo.portfolio_url || pInfo.portfolioUrl || '';
+  const leetcode = pInfo.leetcode_url || pInfo.leetcodeUrl || '';
 
   const contactItems: { label: string; url?: string }[] = [];
   if (phone) contactItems.push({ label: phone, url: `tel:${phone.replace(/[^\d+]/g, '')}` });

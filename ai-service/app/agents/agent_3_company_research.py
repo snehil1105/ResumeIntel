@@ -86,14 +86,14 @@ SPECIALIZED_COMPANY_PROFILES = {
             fit_percentage=94,
             matched_strengths=[
                 "Strong Core Java & Spring Boot backend foundations verified in Master Resume",
-                "HookRelay project directly demonstrates transactional reliability, Redis Streams pub-sub, and Dead Letter Queue error recovery",
-                "Academic CS foundation (Data Structures, DBMS, Operating Systems) from VIT Bhopal (CGPA 8.34/10)",
+                "Hands-on project delivery demonstrates transactional reliability, event-driven architecture, and error recovery",
+                "Solid computer science foundations (Data Structures, DBMS, Operating Systems)",
                 "Full-stack capabilities with React and FastAPI supporting enterprise digital initiatives"
             ],
             gap_skills=[
-                "Review enterprise relational transaction isolation levels (ACID) and Oracle/PostgreSQL index optimization"
+                "Review enterprise relational transaction isolation levels (ACID) and relational index optimization"
             ],
-            recommended_focus="Present HookRelay as an asynchronous decoupling solution handling peak loads with guaranteed at-least-once delivery semantics."
+            recommended_focus="Present primary engineering projects as scalable decoupling solutions handling peak loads with resilient delivery semantics."
         )
     },
     "tata consultancy services": {
@@ -131,12 +131,12 @@ SPECIALIZED_COMPANY_PROFILES = {
         "candidate_alignment": CandidateAlignment(
             fit_percentage=95,
             matched_strengths=[
-                "Strong Core Java & Spring Boot background directly qualifies for TCS Digital / Prime engineering bands",
-                "HookRelay, AI Resume Ranker, and Vehicle Insurance Calculator projects prove practical software development",
-                "Academic excellence from VIT Bhopal (CGPA 8.34/10) with verified CS coursework"
+                "Strong Core Java & Spring Boot background directly qualifies for enterprise engineering bands",
+                "Verifiable engineering projects demonstrate practical end-to-end software delivery",
+                "Solid academic foundation with verified computer science coursework"
             ],
             gap_skills=["Review cloud deployment fundamentals on AWS / Azure"],
-            recommended_focus="Highlight ability to engineer complete backend systems independently and walk interviewers through HookRelay."
+            recommended_focus="Highlight ability to engineer complete backend systems independently and articulate architectural design decisions."
         )
     },
     "zomato": {
@@ -174,12 +174,12 @@ SPECIALIZED_COMPANY_PROFILES = {
         "candidate_alignment": CandidateAlignment(
             fit_percentage=96,
             matched_strengths=[
-                "HookRelay (Redis Streams, asynchronous event pub-sub, DLQ) directly reflects Zomato's event-driven dispatch architecture",
-                "Proven Java & Spring Boot backend development with high test coverage",
-                "Competitive programming practice on LeetCode/Codeforces directly aligns with coding rounds"
+                "Event-driven asynchronous architectures and queue processing directly reflect modern dispatch systems",
+                "Proven backend development with high test coverage and clean abstractions",
+                "Strong analytical problem-solving directly aligns with coding assessments"
             ],
             gap_skills=["Review concurrency primitives and read-write locks for machine coding rounds"],
-            recommended_focus="Emphasize HookRelay's resilience under peak traffic, Dead Letter Queue retry backoff, and Redis Streams fanout."
+            recommended_focus="Emphasize system resilience under peak traffic, automated retry backoff, and distributed fanout."
         )
     }
 }
@@ -403,15 +403,15 @@ class CompanyIntelligenceResearchAgent:
             candidate_alignment = CandidateAlignment(
                 fit_percentage=95,
                 matched_strengths=[
-                    "Core Java & Spring Boot backend architecture verified in Master Resume",
-                    "HookRelay project directly matches Google's distributed systems criteria (Redis Streams pub-sub, guaranteed at-least-once delivery, DLQ, HMAC SHA-256)",
-                    "Academic coursework: Data Structures and Algorithms (VIT Bhopal, CGPA 8.34/10)",
-                    "Active LeetCode and Codeforces practice directly matches online assessment demands"
+                    "Solid software engineering and clean coding fundamentals verified in Master Resume",
+                    "Engineering projects demonstrate distributed systems concepts (asynchronous event handling, fault tolerance, and modular APIs)",
+                    "Strong academic coursework in core Computer Science fundamentals (Data Structures, Algorithms, DBMS)",
+                    "Demonstrated problem-solving agility directly matching technical assessment standards"
                 ],
                 gap_skills=[
                     "Practice Google-specific graph traversal (Dijkstra, BFS/DFS) and medium-hard dynamic programming problems"
                 ],
-                recommended_focus="Emphasize HookRelay's fault-tolerant architecture (DLQ, Redis Streams) and write unit-tested, clean modular code during coding interviews."
+                recommended_focus="Emphasize primary project's fault-tolerant architecture and write unit-tested, clean modular code during coding interviews."
             )
             return CompanyResearchReport(
                 company_name="Google",
@@ -497,15 +497,15 @@ class CompanyIntelligenceResearchAgent:
         candidate_alignment = CandidateAlignment(
             fit_percentage=92,
             matched_strengths=[
-                f"Core Java and Spring Boot backend foundations verified in Master Resume align with {official_name} backend requirements",
-                "Proven distributed asynchronous webhook delivery project (HookRelay) with Redis Streams and Docker",
-                "Strong academic computer science grounding (Data Structures, Algorithms, DBMS, Operating Systems) from VIT Bhopal",
-                "Demonstrated full-stack capabilities with React and FastAPI"
+                f"Core software engineering foundations verified in Master Resume align with {official_name} role requirements",
+                "Proven hands-on engineering project execution demonstrating practical technical delivery",
+                "Strong academic computer science grounding (Data Structures, Algorithms, DBMS, Operating Systems)",
+                "Demonstrated full-stack capabilities with modern application frameworks"
             ],
             gap_skills=[
                 f"Review specific proprietary tools and industry domain workflows used by {official_name}"
             ],
-            recommended_focus=f"Walk interviewers through HookRelay's fault-tolerant architecture (DLQ, Redis Streams) to show engineering ownership."
+            recommended_focus=f"Walk interviewers through key engineering architecture decisions and technical deliverables to show ownership."
         )
 
         all_sources = [
