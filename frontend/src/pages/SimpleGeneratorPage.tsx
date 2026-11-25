@@ -884,7 +884,7 @@ ${(active.involvements || []).join('\n')}
               <div className="p-5 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-center space-y-2.5">
                 <div className="text-xs font-semibold text-slate-700">No Resume Uploaded Yet</div>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  Upload your PDF or DOCX resume file above to auto-extract credentials, or click below to paste text or load a sample profile.
+                  Upload your PDF or DOCX resume file above to auto-extract credentials, or click below to paste text.
                 </p>
                 <div className="flex items-center justify-center gap-2 pt-1">
                   <button
@@ -893,18 +893,6 @@ ${(active.involvements || []).join('\n')}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>{showRawTextEditor ? "Hide Text" : "Paste Resume Text"}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setResume(SNEHIL_MASTER_RESUME);
-                      onUpdateMasterResume(SNEHIL_MASTER_RESUME);
-                      setUploadedFileName("Sample Snehil Tripathi Profile");
-                    }}
-                    className="text-xs text-slate-600 hover:text-slate-800 font-semibold flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm"
-                    title="Load sample profile for testing without uploading a file"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-[#2B59C3]" />
-                    <span>Load Demo Profile</span>
                   </button>
                 </div>
 

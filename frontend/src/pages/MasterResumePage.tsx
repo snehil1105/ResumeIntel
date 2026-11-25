@@ -192,24 +192,28 @@ export const MasterResumePage: React.FC<MasterResumePageProps> = ({
         </div>
 
         <div className="space-y-3">
-          {resume.educations.map((edu, idx) => (
-            <div key={idx} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <input
-                  type="text"
-                  value={edu.institution_name}
-                  onChange={(e) => {
-                    const updated = [...resume.educations];
-                    updated[idx].institution_name = e.target.value;
-                    setResume({ ...resume, educations: updated });
-                  }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-900 text-xs w-2/3 shadow-sm"
-                />
-                <span className="text-slate-500 font-medium">{edu.start_date} – {edu.end_date}</span>
+          {resume.educations && resume.educations.length > 0 ? (
+            resume.educations.map((edu, idx) => (
+              <div key={idx} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <input
+                    type="text"
+                    value={edu.institution_name}
+                    onChange={(e) => {
+                      const updated = [...resume.educations];
+                      updated[idx].institution_name = e.target.value;
+                      setResume({ ...resume, educations: updated });
+                    }}
+                    className="bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-900 text-xs w-2/3 shadow-sm"
+                  />
+                  <span className="text-slate-500 font-medium">{edu.start_date} – {edu.end_date}</span>
+                </div>
+                <p className="text-slate-600">{edu.degree} in {edu.field_of_study} {edu.grade_or_gpa && `| GPA: ${edu.grade_or_gpa}`}</p>
               </div>
-              <p className="text-slate-600">{edu.degree} in {edu.field_of_study} {edu.grade_or_gpa && `| GPA: ${edu.grade_or_gpa}`}</p>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-slate-400 italic text-xs py-2">No education records added yet.</p>
+          )}
         </div>
       </div>
 
@@ -224,28 +228,32 @@ export const MasterResumePage: React.FC<MasterResumePageProps> = ({
         </div>
 
         <div className="space-y-4">
-          {resume.projects.map((proj, pIdx) => (
-            <div key={pIdx} className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <input
-                  type="text"
-                  value={proj.title}
-                  onChange={(e) => {
-                    const updatedProjects = [...resume.projects];
-                    updatedProjects[pIdx].title = e.target.value;
-                    setResume({ ...resume, projects: updatedProjects });
-                  }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-900 text-xs shadow-sm"
-                />
-                <span className="text-slate-500 text-[11px] font-medium">{proj.technologies.join(', ')}</span>
+          {resume.projects && resume.projects.length > 0 ? (
+            resume.projects.map((proj, pIdx) => (
+              <div key={pIdx} className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <input
+                    type="text"
+                    value={proj.title}
+                    onChange={(e) => {
+                      const updatedProjects = [...resume.projects];
+                      updatedProjects[pIdx].title = e.target.value;
+                      setResume({ ...resume, projects: updatedProjects });
+                    }}
+                    className="bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-900 text-xs shadow-sm"
+                  />
+                  <span className="text-slate-500 text-[11px] font-medium">{proj.technologies.join(', ')}</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-slate-600">
+                  {proj.bullet_points.map((b, bIdx) => (
+                    <li key={bIdx}>{b}</li>
+                  ))}
+                </ul>
               </div>
-              <ul className="list-disc list-inside space-y-1 text-slate-600">
-                {proj.bullet_points.map((b, bIdx) => (
-                  <li key={bIdx}>{b}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-slate-400 italic text-xs py-2">No projects uploaded yet.</p>
+          )}
         </div>
       </div>
 
@@ -259,12 +267,16 @@ export const MasterResumePage: React.FC<MasterResumePageProps> = ({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {resume.skills.map((s, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs shadow-sm">
-              <span className="font-semibold text-slate-800">{s.skill_name}</span>
-              <span className="text-[10px] text-slate-500">({s.category})</span>
-            </div>
-          ))}
+          {resume.skills && resume.skills.length > 0 ? (
+            resume.skills.map((s, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs shadow-sm">
+                <span className="font-semibold text-slate-800">{s.skill_name}</span>
+                <span className="text-[10px] text-slate-500">({s.category})</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-400 italic text-xs py-2">No technical skills detected yet.</p>
+          )}
         </div>
       </div>
 
@@ -277,17 +289,15 @@ export const MasterResumePage: React.FC<MasterResumePageProps> = ({
           </div>
         </div>
         <div className="space-y-2 text-xs text-slate-700">
-          {(resume.coursework || [
-            "Cloud Computing: IIT Kharagpur / NPTEL",
-            "Agentic AI Certified Foundations Associate: Oracle University",
-            "Marketing Analysis: IIT Kharagpur / NPTEL",
-            "IBM AI Engineering Professional Certificate: Coursera",
-            "Academic Coursework: Data Structures and Algorithms, Object Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-          ]).map((cw, idx) => (
-            <div key={idx} className="p-2.5 rounded bg-slate-50 border border-slate-200">
-              {cw}
-            </div>
-          ))}
+          {resume.coursework && resume.coursework.length > 0 ? (
+            resume.coursework.map((cw, idx) => (
+              <div key={idx} className="p-2.5 rounded bg-slate-50 border border-slate-200">
+                {cw}
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-400 italic text-xs py-2">No coursework or certifications added yet.</p>
+          )}
         </div>
       </div>
 
@@ -300,14 +310,15 @@ export const MasterResumePage: React.FC<MasterResumePageProps> = ({
           </div>
         </div>
         <div className="space-y-2 text-xs text-slate-700">
-          {(resume.involvements || [
-            "Hackathon Participant: Built a browser-based game at VibeCode Arena, a competitive hackathon hosted on HackerEarth, within a fixed time constraint.",
-            "DSA Practice: Actively solving Data Structures and Algorithms problems on LeetCode and Codeforces."
-          ]).map((inv, idx) => (
-            <div key={idx} className="p-2.5 rounded bg-slate-50 border border-slate-200">
-              {inv}
-            </div>
-          ))}
+          {resume.involvements && resume.involvements.length > 0 ? (
+            resume.involvements.map((inv, idx) => (
+              <div key={idx} className="p-2.5 rounded bg-slate-50 border border-slate-200">
+                {inv}
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-400 italic text-xs py-2">No extracurricular involvements listed.</p>
+          )}
         </div>
       </div>
     </div>
