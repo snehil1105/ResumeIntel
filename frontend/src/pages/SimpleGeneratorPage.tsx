@@ -502,7 +502,8 @@ Minimum Qualifications:
             certifications: resume.certifications || [],
             achievements: resume.achievements || [],
             coursework: resume.coursework || [],
-            involvements: resume.involvements || []
+            involvements: resume.involvements || [],
+            latex_code: (resume as any).latex_code || ''
           },
           company_name: companyName,
           job_title: jobTitle || 'Software Engineer',
@@ -638,8 +639,8 @@ Minimum Qualifications:
   // Download Original LaTeX (.tex)
   const handleDownloadOriginalLatex = () => {
     const active = resume;
-    const result = generateLatexCode(active, '000000');
-    const blob = new Blob([result.latexCode], { type: 'text/x-tex;charset=utf-8' });
+    const origLatex = (active as any).latex_code || generateLatexCode(active, '000000').latexCode;
+    const blob = new Blob([origLatex], { type: 'text/x-tex;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

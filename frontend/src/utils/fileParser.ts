@@ -90,6 +90,7 @@ export async function extractAndParseResumeFile(file: File): Promise<MasterResum
           coursework,
           involvements,
           links: mr.links || [],
+          latex_code: mr.latex_code || mr.latexCode || '',
           rawText: mr.raw_text || mr.rawText || '',
           raw_text: mr.raw_text || mr.rawText || ''
         } as MasterResume;

@@ -11,6 +11,87 @@ from app.providers.llm_provider import BaseLLMProvider, get_groq_provider, get_g
 logger = logging.getLogger(__name__)
 
 
+# Pure styling/formatting reference ONLY (zero personal content or fixed section names)
+UNIVERSAL_LATEX_STYLE_PREAMBLE = r"""% ============================================================
+% ATS-FRIENDLY LATEX RESUME
+% A4 - ONE PAGE - COMPACT BUT READABLE
+% ============================================================
+\documentclass[11pt]{article}
+\usepackage[
+    a4paper,
+    left=0.55in,
+    right=0.55in,
+    top=0.32in,
+    bottom=0.32in
+]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fontawesome5}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{parskip}
+\pagestyle{empty}
+
+\hypersetup{
+    colorlinks=false,
+    pdfborder={0 0 0},
+    pdftitle={CANDIDATE_NAME - Resume},
+    pdfsubject={Resume}
+}
+
+\titleformat{\section}
+    {\large\bfseries\scshape}
+    {}
+    {0em}
+    {}
+    [\vspace{-4pt}\rule{\linewidth}{0.8pt}\vspace{0pt}]
+\titlespacing*{\section}{0pt}{3pt}{2pt}
+
+\setlist[itemize]{
+    leftmargin=*,
+    itemsep=0pt,
+    parsep=0pt,
+    topsep=0pt,
+    partopsep=0pt
+}
+\setlength{\parindent}{0pt}
+\setlength{\tabcolsep}{0pt}
+\setlength{\parskip}{0pt}
+
+\newcommand{\resumeEducation}[5]{
+    \begin{tabularx}{\textwidth}{@{}X r@{}}
+        \textbf{#1} & #4 \\
+        \textit{#3} & \textit{#5} \\
+    \end{tabularx}
+    \vspace{-2pt}
+}
+\newcommand{\resumeSubheading}[4]{
+    \begin{tabularx}{\textwidth}{@{}X r@{}}
+        \textbf{#1} & #2 \\
+        \textit{#3} & \textit{#4} \\
+    \end{tabularx}
+    \vspace{0pt}
+}
+\newcommand{\resumeProject}[3]{
+    \vspace{4pt}
+    \begin{tabularx}{\textwidth}{@{}X r@{}}
+        \textbf{#1} \;|\; \textit{#2} & #3 \\
+    \end{tabularx}
+    \vspace{-1pt}
+}
+\newcommand{\resumeItem}[1]{\item \RaggedRight #1}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=*,itemsep=0pt,parsep=0pt,topsep=0pt,partopsep=0pt,label=\textbullet]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-3pt}}
+\newcommand{\resumeSkill}[2]{\textbf{#1:} #2 \par}
+\newcommand{\resumeLine}[2]{\textbf{#1} #2 \par}
+"""
+
+
 def validate_latex_structure(latex_code: str, resume: MasterResume) -> Dict[str, Any]:
     """
     Deterministic structural & format validator for generated LaTeX.
@@ -329,35 +410,141 @@ Audit Rules (STRICT):
             },
         }
 
+    async def generate_original_latex_dual_llm(
+        self,
+        raw_text: str,
+        fallback_resume: MasterResume,
+    ) -> str:
+        """
+        Builds a 1:1 faithful LaTeX representation directly from the candidate's
+        original extracted PDF text using Groq -> Gemini refinement one-by-one.
+        Uses UNIVERSAL_LATEX_STYLE_PREAMBLE ONLY for font/margin/border/macro styling;
+        strictly preserves the candidate's EXACT section headings, section order,
+        dates, locations, minors, bullets, and links without any alteration.
+        """
+        baseline_latex = self.latex_agent.generate_latex(fallback_resume)
+        candidate_name = fallback_resume.personal_info.full_name or "Candidate"
+        style_preamble = UNIVERSAL_LATEX_STYLE_PREAMBLE.replace("CANDIDATE_NAME", self.latex_agent.escape_latex(candidate_name))
+
+        groq_latex = ""
+        if self.groq:
+            groq_prompt = f"""Convert the candidate's ORIGINAL resume text and extracted hyperlinks into a complete, compilable 1-page A4 LaTeX document.
+
+STRICT FIDELITY RULES:
+1. Use ONLY the styling, geometry, font sizes, borders, and macros from the Style Preamble below (with \\linespread{{0.91}}\\selectfont and \\RaggedRight inside \\begin{{document}}).
+2. PRESERVE EVERY SINGLE DETAIL from the original resume verbatim:
+   - Keep the candidate's EXACT section headings (e.g. if the original says "Extracurricular", use \\section*{{Extracurricular}}, NOT "Involvement"; if it says "Achievements", keep \\section*{{Achievements}}; if it says "Experience", keep \\section*{{Experience}}).
+   - Keep the EXACT section order from the original resume.
+   - Keep EVERY institution, location (e.g. Surathkal, Karnataka), degree, minor degree, GPA, and date verbatim.
+   - Keep EVERY project, technology stack, date, bullet point, and repository link (\\href{{url}}{{\\faGithub}}).
+   - Keep EVERY contact link (\\href{{...}}{{...}}) from the Extracted Hyperlinks.
+   - NEVER add sections the candidate does not have, NEVER drop any line or achievement, and NEVER alter any wording.
+3. Escape all LaTeX special characters (&, %, $, #, _) inside prose properly.
+4. Output ONLY raw compilable LaTeX code starting with \\documentclass and ending with \\end{{document}}.
+
+Style Preamble Reference:
+{style_preamble}
+
+Candidate Original Resume Text & Extracted Hyperlinks:
+{raw_text[:10000]}
+"""
+            try:
+                raw_groq = await self.groq.generate_text(
+                    groq_prompt,
+                    system_prompt="You are a precision LaTeX typesetter. Preserve 100% of the candidate's original headings, order, and content verbatim using the provided style macros."
+                )
+                candidate_groq = _strip_latex_fences(raw_groq)
+                if "\\documentclass" in candidate_groq and "\\end{document}" in candidate_groq:
+                    groq_latex = candidate_groq
+            except Exception as e:
+                logger.warning(f"Original LaTeX Groq generation failed: {e}")
+
+        working_latex = groq_latex or baseline_latex
+
+        if self.gemini:
+            gemini_prompt = f"""You are Gemini auditing and refining a LaTeX conversion of a candidate's ORIGINAL resume.
+Compare the LaTeX below line-by-line against the Candidate's Original Resume Text & Hyperlinks.
+
+Check and fix ALL of the following:
+1. Did the LaTeX drop ANY education entry, minor degree, city/location, project, achievement, extracurricular/involvement item, or hyperlink from the original text? If yes, restore it verbatim!
+2. Did the LaTeX rename ANY original section heading (e.g. changing "Extracurricular" to "Involvement" or dropping "Achievements") or change section order? If yes, restore the exact original heading and order!
+3. Are all LaTeX special characters (&, %, $, #, _) escaped properly in prose, braces balanced, and macros valid so it compiles cleanly on 1 A4 page?
+4. If everything is 100% faithful and compilable, return "is_correct": true and leave "refined_latex" empty. Otherwise set "is_correct": false and return the FULL corrected LaTeX in "refined_latex".
+
+Original Resume Text & Hyperlinks:
+{raw_text[:8000]}
+
+LaTeX to Audit & Refine:
+{working_latex}
+"""
+            audit_schema = """{
+  "is_correct": true,
+  "issues_found": ["list of any missing content, renamed headings, or syntax issues"],
+  "refined_latex": ""
+}"""
+            try:
+                res = await self.gemini.generate_structured(
+                    gemini_prompt,
+                    audit_schema,
+                    system_prompt="You are Gemini, a strict 1:1 resume fidelity & LaTeX compiler auditor. Restore any dropped content or renamed headings and fix any LaTeX syntax errors."
+                )
+                if not res.get("is_correct", True) and res.get("refined_latex"):
+                    refined = _strip_latex_fences(res["refined_latex"])
+                    if "\\documentclass" in refined and "\\end{document}" in refined:
+                        working_latex = refined
+            except Exception as e:
+                logger.warning(f"Original LaTeX Gemini refinement failed: {e}")
+
+        check = validate_latex_structure(working_latex, fallback_resume)
+        if not check["is_valid"]:
+            logger.warning(f"Original Dual-LLM LaTeX failed structural gate ({check['issues']}). Using safe baseline.")
+            return baseline_latex
+        return working_latex
+
     async def generate_and_verify_latex(
         self,
         tailored_resume: MasterResume,
         accent_color_hex: str = "000000",
     ) -> Dict[str, Any]:
         """
-        Step 1 (Groq): Generate/refine LaTeX from the deterministic A4 template + tailored resume.
+        Step 1 (Groq): Generate/refine LaTeX from the candidate's faithful original LaTeX (if available)
+        or deterministic A4 baseline, updating ONLY the tailored bullets & prioritized skills while
+        keeping all original section headings, order, education, and untouched sections verbatim.
         Step 2 (Gemini): Audit the Groq-generated LaTeX for syntax errors, unescaped characters,
         broken formatting, or missing links/sections. If any issue is found, Gemini corrects it.
         Step 3 (Deterministic Safety Gate): Validate structure & braces; if invalid, fall back
         to the guaranteed-compilable LaTeXResumeAgent baseline.
         """
         baseline_latex = self.latex_agent.generate_latex(tailored_resume, accent_color_hex=accent_color_hex)
-        groq_latex = baseline_latex
+        reference_latex = tailored_resume.latex_code if (tailored_resume.latex_code and "\\begin{document}" in tailored_resume.latex_code) else baseline_latex
+        groq_latex = reference_latex
         groq_latex_status = "BASELINE_ONLY"
         gemini_latex_status = "SKIPPED"
         gemini_issues_found: List[str] = []
 
+        tailored_projects_json = json.dumps([
+            {"title": p.title, "technologies": p.technologies, "bullet_points": p.bullet_points}
+            for p in (tailored_resume.projects or [])
+        ], indent=2)
+        prioritized_skills_json = json.dumps([s.skill_name for s in (tailored_resume.skills or [])])
+
         # --- STEP 1: GROQ LATEX SYNTHESIS ---
         if self.groq:
-            groq_prompt = f"""Review and synthesize the final ATS-friendly A4 single-page LaTeX resume below.
-Ensure:
-1. All tailored project bullets, dates, technologies, education entries, coursework, involvements, and clickable \\href links from the baseline are preserved verbatim.
-2. Escape every LaTeX special character (&, %, $, #, _) inside text properly.
-3. Keep the exact A4 geometry, macros (\\resumeEducation, \\resumeProject, \\resumeSkill, \\resumeLine), and clean spacing.
+            groq_prompt = f"""Update the Reference LaTeX below with ONLY the tailored project bullet points and prioritized skill order.
+CRITICAL RULES:
+1. Keep the EXACT preamble, margins, fonts, \\href links, section headings (e.g. Achievements, Extracurricular, etc.), section order, and education entries from the Reference LaTeX 100% untouched.
+2. Replace project bullet points with the updated Tailored Projects bullets below and reorder skills to match Prioritized Skills.
+3. Escape every LaTeX special character (&, %, $, #, _) inside text properly.
 4. Return ONLY raw compilable LaTeX code (no markdown fences, no commentary).
 
-Baseline LaTeX:
-{baseline_latex}
+Tailored Projects Data:
+{tailored_projects_json}
+
+Prioritized Skills Order:
+{prioritized_skills_json}
+
+Reference LaTeX:
+{reference_latex}
 """
             try:
                 raw_groq = await self.groq.generate_text(
