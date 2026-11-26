@@ -71,12 +71,15 @@ class ResumeIntelligenceAgent:
                 full_name = cleaned.title()
                 break
 
-        # Location extraction
+        # Location extraction (single-line only, never spanning into candidate name)
         location = "Remote / Open to Relocation"
-        loc_match = re.search(r'([A-Za-z\s]+,\s*[A-Za-z\s]+-\s*\d{5,6}|[A-Za-z\s]+,\s*[A-Za-z]{2}(?:\s+\d{5})?|[A-Za-z\s]+,\s*(?:USA|India|Canada|UK|Germany|Remote))', clean_text)
+        loc_match = re.search(
+            r'([A-Za-z][A-Za-z \t]+(?:,[ \t]*[A-Za-z \t]+)+[ \t]*-[ \t]*\d{5,6}|[A-Za-z][A-Za-z \t]+,[ \t]*[A-Za-z]{2}(?:[ \t]+\d{5})?|[A-Za-z][A-Za-z \t]+,[ \t]*(?:USA|India|Canada|UK|Germany|Remote))',
+            body_text
+        )
         if loc_match:
             loc_candidate = loc_match.group(0).strip()
-            if len(loc_candidate) < 60 and loc_candidate.lower() != full_name.lower():
+            if len(loc_candidate) < 65 and full_name.lower() not in loc_candidate.lower():
                 location = loc_candidate
 
         # Snehil Tripathi specific profile guard (ONLY if this is authentic Snehil resume)
@@ -440,8 +443,9 @@ class ResumeIntelligenceAgent:
                 else:
                     p_title = "Technical Project"
 
-            # Clean any link icons/symbols like § from title
+            # Clean any link icons/symbols like § or trailing FontAwesome 'W' icon glyph from title
             p_title = re.sub(r'[\u00a7\u2022\*\#\$\^\&]', '', p_title).strip()
+            p_title = re.sub(r'\s+W$', '', p_title).strip()
 
             projects.append(ResumeProject(
                 title=p_title,
@@ -537,6 +541,8 @@ class ResumeIntelligenceAgent:
 
             is_bullet = line.startswith(('•', '-', '*', '–'))
             clean = line.lstrip('•-*– ').strip()
+            # Clean FontAwesome external-link icon artifact 'W' after colons (e.g. "Paper: W \"AI in Education\"")
+            clean = re.sub(r':\s*W\s+', ': ', clean)
             if not clean:
                 continue
 

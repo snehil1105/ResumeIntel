@@ -230,10 +230,10 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     }
   }
 
-  // 5. Detect Location
+  // 5. Detect Location (single-line only, never spanning into candidate name)
   let location = 'Remote / Hybrid';
-  const locMatch = cleanText.match(/([A-Za-z\s]+,\s*[A-Za-z\s]+-\s*\d{5,6}|[A-Za-z\s]+,\s*[A-Za-z]{2}(?:\s+\d{5})?|[A-Za-z\s]+,\s*(?:USA|India|Canada|UK|Germany|Remote))/);
-  if (locMatch && locMatch[0].length < 60 && locMatch[0].toLowerCase() !== fullName.toLowerCase()) {
+  const locMatch = cleanText.match(/([A-Za-z][A-Za-z \t]+(?:,[ \t]*[A-Za-z \t]+)+[ \t]*-[ \t]*\d{5,6}|[A-Za-z][A-Za-z \t]+,[ \t]*[A-Za-z]{2}(?:[ \t]+\d{5})?|[A-Za-z][A-Za-z \t]+,[ \t]*(?:USA|India|Canada|UK|Germany|Remote))/);
+  if (locMatch && locMatch[0].length < 65 && !locMatch[0].toLowerCase().includes(fullName.toLowerCase())) {
     location = locMatch[0].trim();
   }
 
