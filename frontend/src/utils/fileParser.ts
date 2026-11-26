@@ -385,7 +385,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
 
   for (const line of projLines) {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!trimmed || /^[\|\-–—\s•*]+$/.test(trimmed)) continue;
 
     // Bullet detection
     if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('–')) {
@@ -416,6 +416,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     // Project header detection (e.g. "HookRelay | Java, Spring Boot ... June 2026")
     if (trimmed.includes('|') || trimmed.length < 80) {
       const parts = trimmed.split(/[|]/).map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0) continue;
       const first = parts[0];
       const rest = parts.slice(1);
 

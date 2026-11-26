@@ -464,7 +464,7 @@ class ResumeIntelligenceAgent:
 
         for line in lines:
             trimmed = line.strip()
-            if not trimmed:
+            if not trimmed or re.fullmatch(r'[\|\-–—\s•*]+', trimmed):
                 continue
 
             # Repo / Hyperlink detection
@@ -499,6 +499,8 @@ class ResumeIntelligenceAgent:
             # Project Header line (e.g. "HookRelay | Java, Spring Boot ... June 2026")
             if '|' in trimmed or len(trimmed) < 80:
                 parts = [p.strip() for p in re.split(r'[|]', trimmed) if p.strip()]
+                if not parts:
+                    continue
                 first = parts[0]
                 rest = parts[1:] if len(parts) > 1 else []
 
