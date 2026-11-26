@@ -26,7 +26,16 @@ class ResumeIntelligenceAgent:
         # Clean and de-hyphenate text
         clean_text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
         clean_text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', clean_text)
-        lines = [line.strip() for line in clean_text.split('\n') if line.strip()]
+
+        # Separate extracted hyperlinks metadata so it NEVER leaks into resume sections
+        hyperlinks_section = ""
+        body_text = clean_text
+        if "--- EXTRACTED HYPERLINKS ---" in clean_text:
+            parts = clean_text.split("--- EXTRACTED HYPERLINKS ---", 1)
+            body_text = parts[0].strip()
+            hyperlinks_section = parts[1].strip()
+
+        lines = [line.strip() for line in body_text.split('\n') if line.strip()]
 
         # 1. Parse Personal Information (Protected)
         email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', clean_text)
@@ -35,23 +44,18 @@ class ResumeIntelligenceAgent:
         phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', clean_text)
         phone = phone_match.group(0) if phone_match else None
 
-        # Check for extracted hyperlinks section
-        hyperlinks_section = ""
-        if "--- EXTRACTED HYPERLINKS ---" in clean_text:
-            parts = clean_text.split("--- EXTRACTED HYPERLINKS ---")
-            hyperlinks_section = parts[1]
-
         # Links extraction
-        linkedin_match = re.search(r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
+        link_source = hyperlinks_section or body_text
+        linkedin_match = re.search(r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w\-_]+)', link_source, re.IGNORECASE)
         linkedin_url = f"https://www.linkedin.com/in/{linkedin_match.group(1)}" if linkedin_match else None
 
-        github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
+        github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([\w\-_]+)(?:\/|\s|$)', link_source, re.IGNORECASE)
         github_url = f"https://github.com/{github_match.group(1)}" if github_match else None
 
-        leetcode_match = re.search(r'(?:https?:\/\/)?(?:www\.)?leetcode\.com\/(?:u\/)?([\w\-_]+)', hyperlinks_section or clean_text, re.IGNORECASE)
+        leetcode_match = re.search(r'(?:https?:\/\/)?(?:www\.)?leetcode\.com\/(?:u\/)?([\w\-_]+)', link_source, re.IGNORECASE)
         leetcode_url = f"https://leetcode.com/u/{leetcode_match.group(1)}" if leetcode_match else None
 
-        portfolio_match = re.search(r'(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|tech|app)(?:\/[^\s]*)?)', hyperlinks_section or clean_text, re.IGNORECASE)
+        portfolio_match = re.search(r'https?:\/\/([a-zA-Z0-9_.\-]+\.(?:dev|me|io|tech|app)(?:\/[^\s]*)?)', link_source, re.IGNORECASE)
         portfolio_url = f"https://{portfolio_match.group(1)}" if portfolio_match and not any(k in portfolio_match.group(1).lower() for k in ['linkedin', 'github', 'gmail', 'yahoo', 'outlook', 'leetcode']) else None
 
         # Name extraction: scan top lines
@@ -124,8 +128,30 @@ class ResumeIntelligenceAgent:
         # 5. Projects (Editable & Optimizable)
         projects = self._extract_projects(sections.get("projects", []))
 
+        # Attach extracted GitHub repo URLs to matching projects
+        if hyperlinks_section and projects:
+            repo_urls = re.findall(r'https?:\/\/(?:www\.)?github\.com\/[\w\-_.]+\/[\w\-_.]+', hyperlinks_section, re.IGNORECASE)
+            used_repos = set()
+            for proj in projects:
+                if proj.repo_url:
+                    continue
+                title_tokens = [t.lower() for t in re.findall(r'[a-zA-Z0-9]+', proj.title) if len(t) > 2]
+                for r_url in repo_urls:
+                    if r_url in used_repos:
+                        continue
+                    slug = r_url.rsplit('/', 1)[-1].lower()
+                    if any(tok in slug for tok in title_tokens):
+                        proj.repo_url = r_url
+                        used_repos.add(r_url)
+                        break
+            # Positional fallback for remaining unmatched repo URLs
+            remaining_repos = [u for u in repo_urls if u not in used_repos]
+            for proj in projects:
+                if not proj.repo_url and remaining_repos:
+                    proj.repo_url = remaining_repos.pop(0)
+
         # 6. Skills Detection
-        skills = self._extract_skills(sections.get("skills", []), clean_text)
+        skills = self._extract_skills(sections.get("skills", []), body_text)
 
         # 7. Summary / Headline
         summary_lines = sections.get("summary", [])
@@ -139,11 +165,11 @@ class ResumeIntelligenceAgent:
 
         # 8. Coursework & Certifications
         cw_raw = sections.get("coursework", []) or sections.get("certifications", [])
-        coursework = [l.strip('•-* ') for l in cw_raw if len(l.strip('•-* ')) > 4]
+        coursework = self._join_wrapped_items(cw_raw)
 
         # 9. Involvement & Extracurriculars
         inv_raw = sections.get("involvement", []) or sections.get("achievements", [])
-        involvements = [l.strip('•-* ') for l in inv_raw if len(l.strip('•-* ')) > 4]
+        involvements = self._join_wrapped_items(inv_raw)
 
         # Guard for authentic Snehil resume only
         if "SNEHIL" in full_name.upper() and "TRIPATHI" in full_name.upper():
@@ -236,7 +262,7 @@ class ResumeIntelligenceAgent:
                 return
             is_school = any(s in cur_inst.lower() for s in ["school", "vidyalaya", "high school", "convent"])
             deg = cur_deg or ("Secondary Education" if is_school else "Bachelor of Science")
-            field = cur_field if cur_field else ("" if is_school else "Computer Science & Engineering")
+            field = cur_field if cur_field else ("" if (is_school or " in " in deg.lower()) else "Computer Science & Engineering")
             
             # Deduplicate
             exists = any(e.institution_name.lower() == cur_inst.lower() and e.degree.lower() == deg.lower() for e in educations)
@@ -498,59 +524,101 @@ class ResumeIntelligenceAgent:
         save_project()
         return projects
 
-    def _extract_skills(self, skill_section_lines: List[str], full_text: str) -> List[SkillItem]:
-        skill_catalog = [
-            ("Java", "Languages"), ("Python", "Languages"), ("JavaScript", "Languages"),
-            ("TypeScript", "Languages"), ("C++", "Languages"), ("C#", "Languages"),
-            ("Go", "Languages"), ("Rust", "Languages"), ("Ruby", "Languages"), ("SQL", "Languages"),
-            ("HTML/CSS", "Languages"), ("Kotlin", "Languages"), ("Swift", "Languages"),
-            ("Spring Boot", "Technologies and Frameworks"), ("React", "Technologies and Frameworks"),
-            ("Node.js", "Technologies and Frameworks"), ("Express", "Technologies and Frameworks"),
-            ("Next.js", "Technologies and Frameworks"), ("FastAPI", "Technologies and Frameworks"),
-            ("Django", "Technologies and Frameworks"), ("Flask", "Technologies and Frameworks"),
-            ("Angular", "Technologies and Frameworks"), ("Vue.js", "Technologies and Frameworks"),
-            ("PostgreSQL", "Databases"), ("MySQL", "Databases"), ("MongoDB", "Databases"),
-            ("Redis", "Databases"), ("SQLite", "Databases"), ("Cassandra", "Databases"),
-            ("Docker", "Development Tools"), ("Kubernetes", "Development Tools"), ("AWS", "Development Tools"),
-            ("Azure", "Development Tools"), ("GCP", "Development Tools"), ("Git", "Development Tools"),
-            ("Linux", "Development Tools"), ("REST APIs", "Technologies and Frameworks"),
-            ("NumPy", "Machine Learning & AI"), ("Pandas", "Machine Learning & AI"),
-            ("OpenCV", "Machine Learning & AI"), ("Dlib", "Machine Learning & AI"),
-            ("Scikit-Learn", "Machine Learning & AI"), ("TensorFlow", "Machine Learning & AI")
-        ]
+    def _join_wrapped_items(self, raw_lines: List[str]) -> List[str]:
+        """Joins wrapped continuation lines in Coursework/Involvement sections into complete items."""
+        items: List[str] = []
+        for raw in raw_lines:
+            line = raw.strip()
+            if not line:
+                continue
+            # Filter out leaked hyperlink metadata
+            if "EXTRACTED HYPERLINKS" in line.upper() or re.match(r'^(https?:\/\/|mailto:|tel:)', line, re.I):
+                continue
 
-        text_to_search = (" ".join(skill_section_lines) + " " + full_text).lower()
+            is_bullet = line.startswith(('•', '-', '*', '–'))
+            clean = line.lstrip('•-*– ').strip()
+            if not clean:
+                continue
+
+            # Start a new item if it's a bullet, or has a "Label: content" prefix, or no previous item exists
+            has_label = bool(re.match(r'^[A-Z][A-Za-z0-9\s&/\-\(\)]{2,45}:', clean))
+            if is_bullet or has_label or not items:
+                items.append(clean)
+            else:
+                # Continuation of previous wrapped line
+                items[-1] = items[-1].rstrip() + " " + clean
+        return [it for it in items if len(it) > 4]
+
+    def _extract_skills(self, skill_section_lines: List[str], full_text: str) -> List[SkillItem]:
         skills: List[SkillItem] = []
         seen = set()
 
-        for name, category in skill_catalog:
-            pattern = r'\b' + re.escape(name.lower()) + r'\b'
-            if re.search(pattern, text_to_search):
-                if name.lower() not in seen:
-                    seen.add(name.lower())
+        # 1. If the resume has explicit "Category: skill1, skill2" lines, unwrap & parse them cleanly
+        unwrapped_lines: List[str] = []
+        for raw in skill_section_lines:
+            l = raw.strip()
+            if not l:
+                continue
+            if ':' in l and len(l.split(':', 1)[0]) <= 40:
+                unwrapped_lines.append(l)
+            elif unwrapped_lines:
+                unwrapped_lines[-1] = unwrapped_lines[-1].rstrip() + " " + l
+            else:
+                unwrapped_lines.append(l)
+
+        for line in unwrapped_lines:
+            if ':' in line:
+                cat_raw, rest = line.split(':', 1)
+                cat = cat_raw.strip('•-* ')
+                tokens = [t.strip('•-* ') for t in re.split(r'[,|•]', rest) if t.strip()]
+            else:
+                cat = "Technologies and Frameworks"
+                tokens = [t.strip('•-* ') for t in re.split(r'[,|•]', line) if t.strip()]
+
+            for tok in tokens:
+                if 1 <= len(tok) <= 45 and tok.lower() not in seen:
+                    seen.add(tok.lower())
                     skills.append(SkillItem(
                         id=f"skill-{len(skills)+1}",
-                        skill_name=name,
-                        category=category,
-                        proficiency_level="ADVANCED" if category in ["Languages", "Technologies and Frameworks"] else "INTERMEDIATE",
+                        skill_name=tok,
+                        category=cat,
+                        proficiency_level="ADVANCED" if any(k in cat.lower() for k in ["language", "framework", "ai"]) else "INTERMEDIATE",
                         years_experience=2.0,
                         is_verified=True
                     ))
 
-        # Also pull any explicit comma-separated tokens from skill lines
-        for line in skill_section_lines:
-            items = [item.strip('•-*:, ') for item in re.split(r'[,|•]', line) if item.strip()]
-            for item in items:
-                if 2 <= len(item) <= 25 and item.lower() not in seen and not any(kw in item.lower() for kw in ['skill', 'proficient', 'experience', 'technology', 'tools']):
-                    seen.add(item.lower())
-                    skills.append(SkillItem(
-                        id=f"skill-{len(skills)+1}",
-                        skill_name=item.title(),
-                        category="Technologies and Frameworks",
-                        proficiency_level="INTERMEDIATE",
-                        years_experience=1.0,
-                        is_verified=True
-                    ))
+        if skills:
+            return skills
+
+        # 2. Fallback catalog scan only if no explicit Skills section lines were parsed
+        skill_catalog = [
+            ("Java", "Programming Languages"), ("Python", "Programming Languages"), ("JavaScript", "Programming Languages"),
+            ("TypeScript", "Programming Languages"), ("C++", "Programming Languages"), ("C#", "Programming Languages"),
+            ("Go", "Programming Languages"), ("Rust", "Programming Languages"), ("Ruby", "Programming Languages"), ("SQL", "Programming Languages"),
+            ("Spring Boot", "Technologies and Frameworks"), ("React", "Technologies and Frameworks"),
+            ("Node.js", "Technologies and Frameworks"), ("Express", "Technologies and Frameworks"),
+            ("Next.js", "Technologies and Frameworks"), ("FastAPI", "Technologies and Frameworks"),
+            ("Django", "Technologies and Frameworks"), ("Flask", "Technologies and Frameworks"),
+            ("PostgreSQL", "Databases"), ("MySQL", "Databases"), ("MongoDB", "Databases"),
+            ("Redis", "Databases"), ("Docker", "Development Tools"), ("Kubernetes", "Development Tools"),
+            ("AWS", "Development Tools"), ("Git", "Development Tools"), ("Linux", "Development Tools"),
+            ("REST APIs", "Technologies and Frameworks"), ("NumPy", "Machine Learning & Data Analysis"),
+            ("Pandas", "Machine Learning & Data Analysis")
+        ]
+
+        text_lower = full_text.lower()
+        for name, category in skill_catalog:
+            pattern = r'\b' + re.escape(name.lower()) + r'\b'
+            if re.search(pattern, text_lower) and name.lower() not in seen:
+                seen.add(name.lower())
+                skills.append(SkillItem(
+                    id=f"skill-{len(skills)+1}",
+                    skill_name=name,
+                    category=category,
+                    proficiency_level="ADVANCED",
+                    years_experience=2.0,
+                    is_verified=True
+                ))
 
         return skills
 

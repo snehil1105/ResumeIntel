@@ -251,8 +251,8 @@ Audit Rules (STRICT):
                 if not (0 <= b_idx < len(proj.bullet_points)):
                     continue
 
-                orig_b = proj.bullet_points[b_idx].strip()
-                new_b = (edit.get("tailored_bullet") or "").strip()
+                orig_b = re.sub(r'\s+', ' ', proj.bullet_points[b_idx]).strip()
+                new_b = re.sub(r'\s+', ' ', (edit.get("tailored_bullet") or "")).strip()
 
                 # Hard guard: NEVER report a change if nothing actually changed!
                 if not new_b or new_b.lower() == orig_b.lower():
