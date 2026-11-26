@@ -19,36 +19,67 @@ class BaseLLMProvider(ABC):
         pass
 
 class GeminiLLMProvider(BaseLLMProvider):
-    def __init__(self, api_key: str):
+    """
+    Google Gemini LLM Provider using the official Gemini REST API with automatic
+    model fallback across active free-tier models.
+    """
+    DEFAULT_MODELS = [
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemma-4-31b-it"
+    ]
+
+    def __init__(self, api_key: str, models: Optional[list] = None):
         self.api_key = api_key
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            self.client = ChatGoogleGenerativeAI(
-                model="gemini-1.5-pro",
-                google_api_key=api_key,
-                temperature=0.2
-            )
-        except Exception as e:
-            logger.warning(f"Failed to initialize ChatGoogleGenerativeAI: {e}")
-            self.client = None
+        self.models = models or self.DEFAULT_MODELS
+
+    async def _call_gemini(self, prompt: str, system_prompt: Optional[str] = None, json_mode: bool = False) -> str:
+        import httpx
+        payload: Dict[str, Any] = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.15}
+        }
+        if system_prompt:
+            payload["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+        if json_mode:
+            payload["generationConfig"]["responseMimeType"] = "application/json"
+
+        last_err = None
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            for model in self.models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+                try:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates and candidates[0].get("content", {}).get("parts"):
+                            return candidates[0]["content"]["parts"][0]["text"]
+                    else:
+                        last_err = f"{model} HTTP {resp.status_code}: {resp.text[:250]}"
+                        logger.warning(f"Gemini model {model} failed: {last_err}")
+                except Exception as e:
+                    last_err = f"{model} exception: {e}"
+                    logger.warning(f"Gemini model {model} error: {e}")
+
+        raise RuntimeError(f"All Gemini models failed. Last error: {last_err}")
 
     async def generate_structured(self, prompt: str, schema_description: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-        full_prompt = f"{system_prompt or ''}\n\nTask: {prompt}\n\nRequired JSON Schema:\n{schema_description}\n\nReturn ONLY valid JSON matching this schema:"
-        if self.client:
-            res = await self.client.ainvoke(full_prompt)
-            content = res.content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.endswith("```"):
-                content = content[:-3]
-            return json.loads(content.strip())
-        raise RuntimeError("Gemini client not initialized")
+        sys_msg = (system_prompt or "You are an expert AI resume auditor and LaTeX specialist.") + f"\n\nRequired JSON Schema:\n{schema_description}\n\nReturn ONLY valid JSON matching this schema."
+        content = await self._call_gemini(prompt, system_prompt=sys_msg, json_mode=True)
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return json.loads(content.strip())
 
     async def generate_text(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        if self.client:
-            res = await self.client.ainvoke(f"{system_prompt or ''}\n\n{prompt}")
-            return res.content
-        raise RuntimeError("Gemini client not initialized")
+        return await self._call_gemini(prompt, system_prompt=system_prompt, json_mode=False)
 
 class OpenAILLMProvider(BaseLLMProvider):
     def __init__(self, api_key: str):
@@ -336,6 +367,16 @@ class MockDeterministicLLMProvider(BaseLLMProvider):
     async def generate_text(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         return f"AI Analysis Result: Successfully evaluated candidate profile against requirements."
 
+def get_groq_provider() -> Optional[BaseLLMProvider]:
+    if settings.GROQ_API_KEY:
+        return GroqLLMProvider(settings.GROQ_API_KEY)
+    return None
+
+def get_gemini_provider() -> Optional[BaseLLMProvider]:
+    if settings.GEMINI_API_KEY:
+        return GeminiLLMProvider(settings.GEMINI_API_KEY)
+    return None
+
 def get_llm_provider() -> BaseLLMProvider:
     provider = settings.DEFAULT_LLM_PROVIDER.lower()
     if provider == "groq" and settings.GROQ_API_KEY:
@@ -350,6 +391,9 @@ def get_llm_provider() -> BaseLLMProvider:
     elif settings.GROQ_API_KEY:
         logger.info("Defaulting to Groq LLM Provider from detected GROQ_API_KEY")
         return GroqLLMProvider(settings.GROQ_API_KEY)
+    elif settings.GEMINI_API_KEY:
+        logger.info("Defaulting to Gemini LLM Provider from detected GEMINI_API_KEY")
+        return GeminiLLMProvider(settings.GEMINI_API_KEY)
     else:
         logger.info("Using MockDeterministicLLMProvider (No API key required / Offline verified)")
         return MockDeterministicLLMProvider()

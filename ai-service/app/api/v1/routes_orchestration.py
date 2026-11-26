@@ -3,10 +3,13 @@ from typing import Dict, Any, List
 import uuid
 import logging
 
+from pydantic import BaseModel
 from app.workflow.state import WorkflowAgentState
 from app.workflow.graph import ResumeIntelWorkflow
 from app.models.job import JobDescriptionInput
+from app.models.resume import MasterResume
 from app.models.proposals import ProposalDecisionRequest
+from app.agents.dual_llm_verifier import DualLLMVerificationService
 from app.rag.vector_store import vector_store
 from app.rag.chunker import ResumeChunker
 
@@ -16,6 +19,53 @@ router = APIRouter(prefix="/workflow", tags=["Orchestration"])
 # In-memory session state store (backed by Redis/PostgreSQL in prod)
 active_workflows: Dict[str, WorkflowAgentState] = {}
 workflow_engine = ResumeIntelWorkflow()
+dual_llm_service = DualLLMVerificationService()
+
+
+class TailorAndVerifyRequest(BaseModel):
+    master_resume: MasterResume
+    company_name: str
+    job_title: str = "Software Engineer"
+    job_description: str
+    accent_color_hex: str = "000000"
+
+
+@router.post("/tailor-and-verify")
+async def tailor_and_verify(req: TailorAndVerifyRequest):
+    """
+    Dual-LLM Pipeline (Groq + Gemini):
+    1. Groq reasons over JD + MasterResume to propose concrete, factual tailoring edits.
+    2. Gemini double-checks every proposed change (rejecting no-op/fake tailoring & hallucinations).
+    3. Groq generates LaTeX from the verified tailored resume.
+    4. Gemini audits & corrects the LaTeX syntax/formatting, backed by a deterministic safety gate.
+    """
+    try:
+        reasoning_res = await dual_llm_service.tailor_and_verify_resume(
+            master_resume=req.master_resume,
+            company_name=req.company_name,
+            job_title=req.job_title,
+            job_description=req.job_description,
+        )
+        tailored_resume: MasterResume = reasoning_res["tailored_resume"]
+
+        latex_res = await dual_llm_service.generate_and_verify_latex(
+            tailored_resume=tailored_resume,
+            accent_color_hex=req.accent_color_hex,
+        )
+
+        return {
+            "status": "SUCCESS",
+            "tailored_resume": tailored_resume.model_dump(),
+            "detailed_changes": reasoning_res["detailed_changes"],
+            "latex_code": latex_res["latex_code"],
+            "verification_report": {
+                "reasoning_audit": reasoning_res["reasoning_audit"],
+                "latex_audit": latex_res["latex_audit"],
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error in tailor_and_verify: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/research-company")
 async def research_company(company_name: str, job_title: str = "Software Engineer", job_description: str = ""):

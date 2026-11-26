@@ -352,6 +352,8 @@ Minimum Qualifications:
 
   // Generated Tailored Resume State
   const [tailoredResume, setTailoredResume] = useState<MasterResume | null>(null);
+  const [verifiedLatexCode, setVerifiedLatexCode] = useState<string>('');
+  const [verificationReport, setVerificationReport] = useState<any>(null);
 
   const agentSteps = [
     { number: 1, name: 'Resume Intelligence', desc: 'Parsing your uploaded resume and locking protected credentials' },
@@ -386,6 +388,8 @@ Minimum Qualifications:
       setDomainAlignment(null);
       setTailoredResume(null);
       setDetailedChanges([]);
+      setVerifiedLatexCode('');
+      setVerificationReport(null);
     } catch (err: any) {
       console.error("Upload error:", err);
       alert("Could not extract text automatically. You can paste your resume text directly below.");
@@ -407,6 +411,8 @@ Minimum Qualifications:
     setDomainAlignment(null);
     setTailoredResume(null);
     setDetailedChanges([]);
+    setVerifiedLatexCode('');
+    setVerificationReport(null);
   };
 
   // Run Multi-Agent Customization using User's REAL details
@@ -424,6 +430,8 @@ Minimum Qualifications:
     setIsCompleted(false);
     setCurrentAgentIndex(0);
     setTailoredResume(null);
+    setVerifiedLatexCode('');
+    setVerificationReport(null);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -474,13 +482,83 @@ Minimum Qualifications:
         return;
       }
 
-      // Role is compatible -> proceed with full 10 agents
+      // Role is compatible -> call Dual-LLM AI Microservice (Groq + Gemini verification) in parallel with stepper progress
+      let aiData: any = null;
+      const aiPromise = (async () => {
+        const endpoints = [
+          '/api/v1/workflow/tailor-and-verify',
+          'http://127.0.0.1:8000/api/v1/workflow/tailor-and-verify',
+          'https://resumeintel-s052.onrender.com/api/v1/workflow/tailor-and-verify'
+        ];
+        const payload = {
+          master_resume: {
+            ...resume,
+            user_id: resume.userId || 'local-user',
+            personal_info: resume.personal_info || (resume as any).personalInfo || {},
+            educations: resume.educations || [],
+            experiences: resume.experiences || [],
+            projects: resume.projects || [],
+            skills: resume.skills || [],
+            certifications: resume.certifications || [],
+            achievements: resume.achievements || [],
+            coursework: resume.coursework || [],
+            involvements: resume.involvements || []
+          },
+          company_name: companyName,
+          job_title: jobTitle || 'Software Engineer',
+          job_description: jdText,
+          accent_color_hex: '000000'
+        };
+        for (const ep of endpoints) {
+          try {
+            const resp = await fetch(ep, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (resp && resp.ok) {
+              return await resp.json();
+            }
+          } catch {
+            // Try next endpoint
+          }
+        }
+        return null;
+      })();
+
       for (let i = 0; i < agentSteps.length; i++) {
         setCurrentAgentIndex(i);
-        await new Promise(r => setTimeout(r, 550));
+        await new Promise(r => setTimeout(r, 400));
       }
 
-      // Synthesize tailored resume strictly preserving the candidate's exact template and section hierarchy
+      aiData = await aiPromise;
+
+      if (aiData && aiData.status === 'SUCCESS' && aiData.tailored_resume) {
+        const backendTailored: MasterResume = {
+          ...resume,
+          ...aiData.tailored_resume,
+          personalInfo: aiData.tailored_resume.personal_info || resume.personalInfo
+        };
+        const realChanges = (aiData.detailed_changes || []).filter(
+          (c: DetailedChangeItem) =>
+            c.beforeSnippet &&
+            c.afterSnippet &&
+            c.beforeSnippet.trim().toLowerCase() !== c.afterSnippet.trim().toLowerCase()
+        );
+        setDetailedChanges(realChanges);
+        setVerifiedLatexCode(aiData.latex_code || '');
+        setVerificationReport(aiData.verification_report || null);
+        setTailoredResume(backendTailored);
+        setIsCompleted(true);
+        setActiveResultView('side_by_side');
+
+        if (onSaveToApplications) {
+          onSaveToApplications(companyName, jobTitle, 95);
+        }
+        return;
+      }
+
+      // Offline fallback: Synthesize tailored resume strictly preserving template & filtering out no-op diffs
       const tailored: MasterResume = JSON.parse(JSON.stringify(resume));
 
       // Do NOT inject professional summary if the master resume does not have one
@@ -500,7 +578,7 @@ Minimum Qualifications:
       });
       tailored.skills = prioritizedSkills;
 
-      // Dynamically tailor candidate's actual project bullet points emphasizing target role & stack while strictly preserving 100% factual fidelity
+      // Dynamically tailor candidate's actual project bullet points
       if (tailored.projects && tailored.projects.length > 0) {
         tailored.projects = tailored.projects.map((proj, pIdx) => {
           if (pIdx === 0 && proj.bullet_points && proj.bullet_points.length > 0) {
@@ -522,7 +600,7 @@ Minimum Qualifications:
                 enhancedFirst,
                 ...proj.bullet_points.slice(1)
               ],
-              is_tailored: true
+              is_tailored: enhancedFirst.trim().toLowerCase() !== origFirst.trim().toLowerCase()
             };
           }
           return proj;
@@ -534,7 +612,9 @@ Minimum Qualifications:
       tailored.involvements = (resume.involvements && resume.involvements.length > 0) ? resume.involvements : (resume.achievements || []);
 
       try {
-        const changes = generateDetailedChanges(resume, tailored, companyName, jobTitle, jdText);
+        const changes = generateDetailedChanges(resume, tailored, companyName, jobTitle, jdText).filter(
+          (c) => c.beforeSnippet.trim().toLowerCase() !== c.afterSnippet.trim().toLowerCase()
+        );
         setDetailedChanges(changes);
       } catch (changesErr) {
         console.warn("Failed to generate detailed changes:", changesErr);
@@ -572,8 +652,8 @@ Minimum Qualifications:
   // Download Tailored LaTeX (.tex)
   const handleDownloadTailoredLatex = () => {
     const active = tailoredResume || resume;
-    const result = generateLatexCode(active, '000000');
-    const blob = new Blob([result.latexCode], { type: 'text/x-tex;charset=utf-8' });
+    const latexToDownload = verifiedLatexCode || generateLatexCode(active, '000000').latexCode;
+    const blob = new Blob([latexToDownload], { type: 'text/x-tex;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1107,6 +1187,14 @@ ${(active.involvements || []).join('\n')}
                 <span className="text-xs text-blue-600 font-medium">
                   {detailedChanges.length} Tailored Adjustments
                 </span>
+                {verificationReport && (
+                  <>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Groq + Gemini Verified ({verificationReport?.latex_audit?.structural_validation?.is_valid ? 'Format Valid' : 'Checked'})
+                    </span>
+                  </>
+                )}
               </div>
               <h2 className="text-lg md:text-xl font-bold text-slate-900 mt-1">
                 Customized Resume Comparison — {companyName} ({jobTitle})
@@ -1176,6 +1264,7 @@ ${(active.involvements || []).join('\n')}
                     companyName={companyName}
                     jobTitle={jobTitle}
                     initialTab="pdf"
+                    overrideLatexCode={verifiedLatexCode || undefined}
                   />
                 </div>
               )}
@@ -1187,6 +1276,7 @@ ${(active.involvements || []).join('\n')}
                     companyName={companyName}
                     jobTitle={jobTitle}
                     initialTab="latex"
+                    overrideLatexCode={verifiedLatexCode || undefined}
                   />
                 </div>
               )}

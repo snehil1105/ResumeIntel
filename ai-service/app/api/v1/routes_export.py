@@ -6,10 +6,12 @@ from app.models.resume import MasterResume
 from app.document.pdf_generator import ATSPDFGenerator
 from app.document.docx_generator import ATSDOCXGenerator
 from app.agents.agent_latex_resume import LaTeXResumeAgent
+from app.agents.dual_llm_verifier import DualLLMVerificationService
 from app.core.config import settings
 
 router = APIRouter(prefix="/export", tags=["Export & Generation"])
 latex_agent = LaTeXResumeAgent()
+dual_llm_service = DualLLMVerificationService()
 
 @router.post("/generate-pdf")
 async def generate_pdf_resume(
@@ -64,8 +66,10 @@ async def generate_latex_resume(
     # Auto-extract color from previous resume text if available
     detected = latex_agent.extract_style_and_color(resume.raw_text or "")
     active_color = accent_color_hex or f"#{detected['accent_color']}"
-    
-    latex_code = latex_agent.generate_latex(resume, accent_color_hex=active_color)
+
+    latex_res = await dual_llm_service.generate_and_verify_latex(resume, accent_color_hex=active_color)
+    latex_code = latex_res["latex_code"]
+    latex_audit = latex_res["latex_audit"]
     
     tex_path = f"{gen_dir}/Resume_{company_name.replace(' ', '_')}_{file_id[:8]}.tex"
     with open(tex_path, "w", encoding="utf-8") as f:
@@ -77,10 +81,11 @@ async def generate_latex_resume(
         "accent_color": active_color,
         "download_url": f"/api/v1/export/download?file_path={tex_path}",
         "validation": {
-            "status": "VALID",
+            "status": "VALID" if latex_audit["structural_validation"]["is_valid"] else "INVALID",
             "syntax_checked": True,
-            "error_count": 0,
-            "compiler_compatibility": "Overleaf / TeX Live / MiKTeX / MacTeX"
+            "error_count": len(latex_audit["structural_validation"]["issues"]),
+            "compiler_compatibility": "Overleaf / TeX Live / MiKTeX / MacTeX",
+            "dual_llm_audit": latex_audit
         }
     }
 

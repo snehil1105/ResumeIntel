@@ -46,6 +46,7 @@ interface ResumePDFDocumentViewerProps {
   jobTitle?: string;
   onUpdateColor?: (hex: string) => void;
   initialTab?: 'pdf' | 'latex';
+  overrideLatexCode?: string;
 }
 
 export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = ({
@@ -53,7 +54,8 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
   companyName = "Company",
   jobTitle = "Software Engineer",
   onUpdateColor,
-  initialTab = 'pdf'
+  initialTab = 'pdf',
+  overrideLatexCode
 }) => {
   // Default to classic black LaTeX format as seen in user's original resume
   const initialStyle = extractStyleAndColor(resume.raw_text || (resume as any).rawText);
@@ -79,8 +81,9 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
     { name: 'Deep Burgundy', hex: '#831843' }
   ];
 
-  // Synthesize 100% bug-free LaTeX code matching user's exact template
+  // Synthesize 100% bug-free LaTeX code (preferring Groq-generated + Gemini-verified LaTeX when available)
   const latexResult = generateLatexCode(resume, accentColor);
+  const activeLatexCode = overrideLatexCode || latexResult.latexCode;
 
   const handleColorChange = (hex: string) => {
     setAccentColor(hex);
@@ -88,13 +91,13 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
   };
 
   const handleCopyLatex = () => {
-    navigator.clipboard.writeText(latexResult.latexCode);
+    navigator.clipboard.writeText(activeLatexCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadTex = () => {
-    const blob = new Blob([latexResult.latexCode], { type: 'text/x-tex;charset=utf-8' });
+    const blob = new Blob([activeLatexCode], { type: 'text/x-tex;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -626,7 +629,7 @@ export const ResumePDFDocumentViewer: React.FC<ResumePDFDocumentViewerProps> = (
           </div>
 
           <pre className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 overflow-x-auto text-[11px] leading-relaxed max-h-[600px] select-all font-mono">
-            {latexResult.latexCode}
+            {activeLatexCode}
           </pre>
         </div>
       )}

@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 10
     
     class Config:
-        env_file = [".env", "../.env"]
+        env_file = [
+            ".env",
+            "../.env",
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+        ]
         extra = "allow"
 
 settings = Settings()
