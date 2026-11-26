@@ -1,5 +1,6 @@
 import re
 import uuid
+import json
 import logging
 from typing import Dict, Any, List, Optional
 from app.models.resume import (
@@ -7,6 +8,7 @@ from app.models.resume import (
     ProtectedExperience, ResumeProject, SkillItem
 )
 from app.core.exceptions import DocumentParsingException
+from app.providers.llm_provider import get_groq_provider, get_gemini_provider
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +188,224 @@ class ResumeIntelligenceAgent:
             involvements=involvements,
             raw_text=raw_text
         )
+
+    async def extract_with_dual_llm(self, raw_text: str, user_id: str) -> MasterResume:
+        """
+        Agent 1 Dual-LLM Extraction:
+        1. Builds fast deterministic baseline via extract_from_raw_text.
+        2. Uses Groq to cleanly parse ANY resume layout (wrapped headers, icons, multi-column)
+           into structured MasterResume JSON.
+        3. Uses Gemini to double-check Groq's JSON against the raw text so zero projects,
+           links, skills, or involvement lines are merged, dropped, or fabricated.
+        """
+        baseline = self.extract_from_raw_text(raw_text, user_id)
+        groq = get_groq_provider()
+        gemini = get_gemini_provider()
+
+        if not groq and not gemini:
+            return baseline
+
+        schema_desc = """{
+  "personal_info": {
+    "full_name": "Candidate Full Name",
+    "email": "email@example.com",
+    "phone": "+91...",
+    "location": "City, State (or null if not present; NEVER a university name)",
+    "linkedin_url": "https://...",
+    "github_url": "https://...",
+    "portfolio_url": "https://...",
+    "leetcode_url": "https://..."
+  },
+  "educations": [
+    {
+      "institution_name": "University / School Name",
+      "degree": "Full Degree Name",
+      "field_of_study": "",
+      "grade_or_gpa": "CGPA / %",
+      "start_date": "Start",
+      "end_date": "End"
+    }
+  ],
+  "experiences": [
+    {
+      "company_name": "Company",
+      "job_title": "Role",
+      "location": "City",
+      "start_date": "Start",
+      "end_date": "End",
+      "bullet_points": ["bullet 1"]
+    }
+  ],
+  "projects": [
+    {
+      "title": "Exact Project Title (no trailing icon letters like W or §)",
+      "technologies": ["Tech1", "Tech2"],
+      "start_date": "Date",
+      "end_date": "Date",
+      "repo_url": "https://github.com/...",
+      "bullet_points": ["Complete bullet 1", "Complete bullet 2"]
+    }
+  ],
+  "skills": [
+    {"category": "Languages", "skill_name": "Python"}
+  ],
+  "coursework": ["Label: description (empty list if resume has no Coursework/Certifications section)"],
+  "involvements": ["Label: description (empty list if resume has no Involvement/Achievements section)"]
+}"""
+
+        parse_prompt = f"""Parse the following resume text and extracted hyperlinks into clean, 100% factual structured JSON.
+CRITICAL RULES:
+1. Separate EVERY distinct project into its own object in `projects` (never merge a second project into the previous project's bullet_points!).
+2. Keep `technologies` clean (no dates, no empty strings, no leading commas).
+3. Strip PDF icon artifacts (like trailing `W` or `§`) from project titles and involvement labels.
+4. `location` must ONLY be the candidate's city/state/country (never a university/college name).
+5. Only include `coursework` or `involvements` if the resume actually has those sections. Never invent or copy data not in the text.
+6. Match extracted GitHub repository URLs to their corresponding projects in `repo_url`.
+
+Resume Text & Extracted Hyperlinks:
+{raw_text[:9000]}
+"""
+
+        parsed_json: Optional[Dict[str, Any]] = None
+        if groq:
+            try:
+                parsed_json = await groq.generate_structured(
+                    parse_prompt,
+                    schema_desc,
+                    system_prompt="You are Agent 1, a precision resume parser. Extract 100% factual structured data without merging projects or inventing fields."
+                )
+            except Exception as e:
+                logger.warning(f"Agent 1 Groq extraction failed: {e}")
+
+        if gemini:
+            audit_prompt = f"""Double-check and fix the parsed resume JSON below against the raw resume text.
+Check:
+1. Are ALL projects separated cleanly (no project swallowed inside another project's bullet_points)?
+2. Are all `technologies` clean (no dates, no empty strings)?
+3. Is `location` strictly the candidate's home city/location (or null if none — NEVER a university/education name)?
+4. Are all social links and project `repo_url`s preserved from the extracted hyperlinks?
+5. Are `coursework` and `involvements` strictly from the resume (not invented, not split across line wraps)?
+
+Raw Resume Text:
+{raw_text[:7000]}
+
+Parsed JSON to Verify:
+{json.dumps(parsed_json or baseline.model_dump(mode='json'), indent=2)[:7000]}
+"""
+            try:
+                verified_json = await gemini.generate_structured(
+                    audit_prompt,
+                    schema_desc,
+                    system_prompt="You are Gemini auditing Agent 1's resume parsing. Fix any merged projects, dirty tech stacks, leaked university names in location, or split lines."
+                )
+                if isinstance(verified_json, dict) and verified_json.get("personal_info"):
+                    parsed_json = verified_json
+            except Exception as e:
+                logger.warning(f"Agent 1 Gemini verification failed: {e}")
+
+        if not parsed_json or not isinstance(parsed_json, dict):
+            return baseline
+
+        try:
+            p_raw = parsed_json.get("personal_info") or {}
+            loc_val = (p_raw.get("location") or "").strip()
+            if any(k in loc_val.lower() for k in ["university", "institute", "college", "school", "education"]):
+                loc_val = ""
+
+            p_info = ProtectedPersonalInfo(
+                full_name=(p_raw.get("full_name") or baseline.personal_info.full_name).strip(),
+                email=(p_raw.get("email") or baseline.personal_info.email).strip(),
+                phone=p_raw.get("phone") or baseline.personal_info.phone,
+                location=loc_val or None,
+                linkedin_url=p_raw.get("linkedin_url") or baseline.personal_info.linkedin_url,
+                github_url=p_raw.get("github_url") or baseline.personal_info.github_url,
+                portfolio_url=p_raw.get("portfolio_url") or baseline.personal_info.portfolio_url,
+                leetcode_url=p_raw.get("leetcode_url") or baseline.personal_info.leetcode_url,
+            )
+
+            edus = [
+                ProtectedEducation(
+                    institution_name=e.get("institution_name", ""),
+                    degree=e.get("degree", ""),
+                    field_of_study=e.get("field_of_study") or "",
+                    grade_or_gpa=e.get("grade_or_gpa"),
+                    start_date=e.get("start_date") or "",
+                    end_date=e.get("end_date") or "",
+                    is_verified=True,
+                )
+                for e in (parsed_json.get("educations") or [])
+                if e.get("institution_name")
+            ] or baseline.educations
+
+            exps = [
+                ProtectedExperience(
+                    company_name=ex.get("company_name", ""),
+                    job_title=ex.get("job_title", "Software Engineer"),
+                    location=ex.get("location") or "",
+                    start_date=ex.get("start_date") or "",
+                    end_date=ex.get("end_date") or "Present",
+                    bullet_points=[b.strip() for b in (ex.get("bullet_points") or []) if b and b.strip()],
+                    is_verified=True,
+                )
+                for ex in (parsed_json.get("experiences") or [])
+                if ex.get("company_name")
+            ]
+
+            projs = []
+            for p in (parsed_json.get("projects") or []):
+                title = re.sub(r'\s+[W§]$', '', (p.get("title") or "").strip()).strip()
+                if not title:
+                    continue
+                techs = [t.strip(' ,;|') for t in (p.get("technologies") or []) if t and t.strip(' ,;|')]
+                bullets = [b.strip() for b in (p.get("bullet_points") or []) if b and b.strip()]
+                projs.append(ResumeProject(
+                    title=title,
+                    role="Developer",
+                    start_date=p.get("start_date") or "",
+                    end_date=p.get("end_date") or p.get("start_date") or "",
+                    summary=bullets[0] if bullets else "",
+                    technologies=techs,
+                    bullet_points=bullets,
+                    repo_url=p.get("repo_url") or None,
+                    is_verified=True,
+                ))
+            if not projs:
+                projs = baseline.projects
+
+            skills = [
+                SkillItem(
+                    id=f"skill-{i+1}",
+                    category=(s.get("category") or "Technologies and Frameworks").strip(),
+                    skill_name=(s.get("skill_name") or "").strip(),
+                    proficiency_level="ADVANCED",
+                    years_experience=2.0,
+                    is_verified=True,
+                )
+                for i, s in enumerate(parsed_json.get("skills") or [])
+                if s.get("skill_name") and s.get("skill_name").strip()
+            ] or baseline.skills
+
+            cw = [c.strip() for c in (parsed_json.get("coursework") or []) if c and c.strip()]
+            inv = [iv.strip() for iv in (parsed_json.get("involvements") or []) if iv and iv.strip()]
+
+            return MasterResume(
+                user_id=user_id,
+                personal_info=p_info,
+                headline=f"Software Engineer | {skills[0].skill_name if skills else 'Full Stack'}",
+                professional_summary=baseline.professional_summary,
+                educations=edus,
+                experiences=exps,
+                projects=projs,
+                skills=skills,
+                certifications=cw[:5],
+                achievements=inv[:5],
+                coursework=cw,
+                involvements=inv,
+                raw_text=raw_text,
+            )
+        except Exception as e:
+            logger.warning(f"Failed building MasterResume from Dual-LLM JSON: {e}. Using baseline.")
+            return baseline
 
     def _partition_sections(self, lines: List[str]) -> Dict[str, List[str]]:
         """Splits resume text lines into named sections."""

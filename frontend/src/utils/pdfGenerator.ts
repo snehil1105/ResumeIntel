@@ -26,7 +26,7 @@ function buildResumePdfDoc(resume: MasterResume, scale: number): jsPDF {
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 34;
   const contentWidth = pageWidth - margin * 2;
-  const bottomMargin = 24;
+  const bottomMargin = 34;
   let y = 30;
 
   const fBody = 9.0 * scale;
@@ -239,8 +239,9 @@ function buildResumePdfDoc(resume: MasterResume, scale: number): jsPDF {
       }
 
       const dateStr = sanitizePdfText(proj.end_date || proj.start_date || '');
-      const techStr = proj.technologies && proj.technologies.length > 0
-        ? ` | ${proj.technologies.join(', ')}`
+      const cleanTechs = (proj.technologies || []).map(t => sanitizePdfText(t).replace(/^,+|,+$/g, '').trim()).filter(Boolean);
+      const techStr = cleanTechs.length > 0
+        ? ` | ${cleanTechs.join(', ')}`
         : '';
       if (techStr) {
         doc.setFont('times', 'italic');
