@@ -265,6 +265,7 @@ CRITICAL RULES:
 4. `location` must ONLY be the candidate's city/state/country (never a university/college name).
 5. Only include `coursework`, `achievements`, or `involvements` if the resume actually has those sections. Keep `achievements` and `involvements` strictly separate. Never invent or copy data not in the text.
 6. Match extracted GitHub repository URLs to their corresponding projects in `repo_url`.
+7. NEVER shorten or abbreviate Education! Keep full institution names, locations, full degree & branch names (e.g. "Bachelor of Technology - Electrical and Electronics Engineering"), minor degrees, CGPAs/percentages, and exact dates verbatim.
 
 Resume Text & Extracted Hyperlinks:
 {raw_text[:9000]}
@@ -516,7 +517,16 @@ Parsed JSON to Verify:
                 continue
 
             if deg_detected:
-                cur_deg = deg_detected
+                deg_clean = line
+                if line_dates:
+                    deg_clean = deg_clean.replace(line_dates, '').strip()
+                if line_gpa:
+                    deg_clean = deg_clean.replace(line_gpa, '').strip()
+                deg_clean = re.sub(r'[-–|,\s]*(?:CGPA|GPA|Percentage|Grade)\s*:?\s*$', '', deg_clean, flags=re.I).strip(' -–|,')
+                if re.match(r'^minor\b', deg_clean, re.I) and cur_deg:
+                    cur_deg = f"{cur_deg} ({deg_clean})"
+                else:
+                    cur_deg = deg_clean or deg_detected
 
             if line_dates:
                 parts = [p.strip() for p in re.split(r'[-–—]|\bto\b', line_dates) if p.strip()]
@@ -531,10 +541,11 @@ Parsed JSON to Verify:
 
     def _detect_degree(self, text: str) -> Optional[str]:
         degree_patterns = [
-            (r'b\.tech(?:\s+in\s+[\w\s&]+)?', 'B.Tech in Computer Science and Engineering'),
-            (r'intermediate(?:\s*\(\s*12th\s*grade\s*\))?|12th\s*grade', 'Intermediate (12th Grade)'),
-            (r'matriculation(?:\s*\(\s*10th\s*grade\s*\))?|10th\s*grade', 'Matriculation (10th Grade)'),
-            (r'bachelor(?:[\w\s\']*)?(?:in\s+[\w\s&]+)?', 'Bachelor of Science'),
+            (r'b\.tech(?:\s+in\s+[\w\s&]+)?', 'B.Tech'),
+            (r'intermediate(?:\s*\(\s*12th\s*grade\s*\))?|12th\s*(?:grade|board)|gshseb|cbse|icse|hsc', '12th Board'),
+            (r'matriculation(?:\s*\(\s*10th\s*grade\s*\))?|10th\s*(?:grade|board)|ssc', '10th Board'),
+            (r'minor\s+in\s+[\w\s&]+', 'Minor'),
+            (r'bachelor(?:[\w\s\']*)?(?:in\s+[\w\s&]+)?', 'Bachelor of Technology'),
             (r'master(?:[\w\s\']*)?(?:in\s+[\w\s&]+)?', 'Master of Science'),
             (r'm\.tech(?:\s+in\s+[\w\s&]+)?', 'M.Tech'),
             (r'b\.s\.?(?:\s+in\s+[\w\s&]+)?', 'Bachelor of Science'),

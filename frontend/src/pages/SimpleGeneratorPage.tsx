@@ -608,9 +608,10 @@ Minimum Qualifications:
         });
       }
 
-      // Preserve authentic coursework & involvements
-      tailored.coursework = (resume.coursework && resume.coursework.length > 0) ? resume.coursework : (resume.certifications || []);
-      tailored.involvements = (resume.involvements && resume.involvements.length > 0) ? resume.involvements : (resume.achievements || []);
+      // Preserve authentic coursework, achievements & involvements strictly untouched
+      tailored.coursework = resume.coursework || [];
+      tailored.achievements = resume.achievements || [];
+      tailored.involvements = resume.involvements || [];
 
       try {
         const changes = generateDetailedChanges(resume, tailored, companyName, jobTitle, jdText).filter(
