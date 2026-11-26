@@ -1,5 +1,4 @@
 import { MasterResume, ProtectedPersonalInfo, ProtectedEducation, ProtectedExperience, ResumeProject, SkillItem } from '../types';
-import { SNEHIL_MASTER_RESUME } from './defaultResume';
 
 export function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -180,16 +179,6 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
   // De-hyphenate broken words across line wraps
   cleanText = cleanText.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
 
-  // If this is Snehil Tripathi's resume, preserve 100% authoritative master fidelity
-  if (cleanText.toUpperCase().includes('SNEHIL') && cleanText.toUpperCase().includes('TRIPATHI')) {
-    return {
-      ...SNEHIL_MASTER_RESUME,
-      id: `resume-${Date.now()}`,
-      rawText: cleanText,
-      raw_text: cleanText
-    };
-  }
-
   const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
 
   // 1. Extract Email
@@ -230,14 +219,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     }
   }
 
-  // 5. Detect Location (single-line only, never spanning into candidate name)
-  let location = 'Remote / Hybrid';
-  const locMatch = cleanText.match(/([A-Za-z][A-Za-z \t]+(?:,[ \t]*[A-Za-z \t]+)+[ \t]*-[ \t]*\d{5,6}|[A-Za-z][A-Za-z \t]+,[ \t]*[A-Za-z]{2}(?:[ \t]+\d{5})?|[A-Za-z][A-Za-z \t]+,[ \t]*(?:USA|India|Canada|UK|Germany|Remote))/);
-  if (locMatch && locMatch[0].length < 65 && !locMatch[0].toLowerCase().includes(fullName.toLowerCase())) {
-    location = locMatch[0].trim();
-  }
-
-  // 6. Section Partitioning
+  // 5. Section Partitioning (partition first so location only scans header)
   const sectionKeywords: Record<string, string[]> = {
     education: ['education', 'academic background', 'qualifications', 'academics'],
     experience: ['experience', 'work experience', 'employment history', 'internships'],
@@ -273,6 +255,19 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     if (!found) {
       sectionBuckets[activeSection]?.push(line);
     }
+  }
+
+  // 6. Detect Location (strictly from header lines only, never university/education names)
+  let location = '';
+  const headerText = sectionBuckets.header.slice(0, 8).join('\n');
+  const locMatch = headerText.match(/([A-Za-z][A-Za-z \t]+(?:,[ \t]*[A-Za-z \t]+)+[ \t]*-[ \t]*\d{5,6}|[A-Za-z][A-Za-z \t]+,[ \t]*[A-Za-z]{2}(?:[ \t]+\d{5})?|[A-Za-z][A-Za-z \t]+,[ \t]*(?:USA|India|Canada|UK|Germany|Remote))/);
+  if (
+    locMatch &&
+    locMatch[0].length < 65 &&
+    !locMatch[0].toLowerCase().includes(fullName.toLowerCase()) &&
+    !/university|institute|college|school|education/i.test(locMatch[0])
+  ) {
+    location = locMatch[0].trim();
   }
 
   // 7. Parse Education (Protected)
@@ -394,8 +389,11 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
       continue;
     }
 
-    // Continuation of previous bullet: if we have bullets and this line is a continuation
-    if (pBullets.length > 0 && (trimmed[0].toLowerCase() === trimmed[0] || !trimmed.includes('|') || trimmed.length > 85)) {
+    // Explicit pipe project header (e.g. "Webate: Tech Enthusiast Debate Platform | WebRTC, React ... Dec 2023")
+    const isPipeHeader = trimmed.includes('|') && /^[A-Z]/.test(trimmed);
+
+    // Continuation of previous bullet (only when NOT an explicit pipe project header)
+    if (pBullets.length > 0 && !isPipeHeader && (trimmed[0].toLowerCase() === trimmed[0] || trimmed.length > 85)) {
       pBullets[pBullets.length - 1] = `${pBullets[pBullets.length - 1]} ${trimmed}`;
       continue;
     }
@@ -414,14 +412,15 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     }
 
     // Project header detection (e.g. "HookRelay | Java, Spring Boot ... June 2026")
-    if (trimmed.includes('|') || trimmed.length < 80) {
-      const parts = trimmed.split(/[|]/).map(p => p.trim()).filter(Boolean);
+    if (isPipeHeader || trimmed.length < 80) {
+      const dMatch = trimmed.match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$/i);
+      const headerDate = dMatch ? dMatch[1].trim() : '';
+      const headerBody = dMatch ? trimmed.slice(0, dMatch.index).replace(/^[\s–|-]+|[\s–|-]+$/g, '') : trimmed;
+
+      const parts = headerBody.split(/[|]/).map(p => p.trim()).filter(Boolean);
       if (parts.length === 0) continue;
       const first = parts[0];
       const rest = parts.slice(1);
-
-      const dMatch = trimmed.match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$/i);
-      const headerDate = dMatch ? dMatch[1].trim() : '';
 
       const isFirstDate = dateRegex.test(first) && first.length < 30;
       let headerTitle = '';
@@ -430,12 +429,11 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
       if (isFirstDate) {
         headerTitle = '';
         pDate = first;
-        headerTechs = rest.flatMap(p => p.split(',').map(t => t.trim()).filter(Boolean));
+        headerTechs = rest.flatMap(p => p.split(',').map(t => t.replace(/^[\s,;]+|[\s,;]+$/g, '')).filter(Boolean));
       } else {
-        headerTitle = first;
-        if (headerDate) headerTitle = headerTitle.replace(headerDate, '').trim();
+        headerTitle = first.replace(/^[\s–|-]+|[\s–|-]+$/g, '');
         pDate = headerDate || pDate;
-        headerTechs = rest.flatMap(p => p.split(',').map(t => t.trim()).filter(Boolean));
+        headerTechs = rest.flatMap(p => p.split(',').map(t => t.replace(/^[\s,;]+|[\s,;]+$/g, '')).filter(Boolean));
       }
 
       if (pTitle || pBullets.length > 0) {

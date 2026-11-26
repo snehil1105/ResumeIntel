@@ -103,6 +103,30 @@ class LaTeXResumeAgent:
 {chr(10).join(edu_entries)}
 """ if edu_entries else ""
 
+        # 1b. EXPERIENCE (IF PRESENT)
+        exp_entries = []
+        for exp in (resume.experiences or []):
+            comp = self.escape_latex(exp.company_name)
+            role = self.escape_latex(exp.job_title)
+            dates = self.escape_latex(f"{exp.start_date or ''} -- {exp.end_date or 'Present'}".strip(' -'))
+            loc = self.escape_latex(exp.location or "")
+            bullets = [f"\\resumeItem{{\n{self.escape_latex(bp)}\n}}" for bp in (exp.bullet_points or [])]
+            exp_entries.append(f"""\\resumeSubheading
+{{{comp}}}
+{{{dates}}}
+{{{role}}}
+{{{loc}}}
+\\resumeItemListStart
+{chr(10).join(bullets)}
+\\resumeItemListEnd""")
+
+        exp_section = f"""% ============================================================
+% EXPERIENCE
+% ============================================================
+\\section*{{Experience}}
+{chr(10).join(exp_entries)}
+""" if exp_entries else ""
+
         # 2. PROJECTS (SECOND)
         proj_entries = []
         for proj in (resume.projects or []):
@@ -110,7 +134,7 @@ class LaTeXResumeAgent:
             repo = proj.repo_url
             title_with_link = f"{title} \\href{{{repo}}}{{\\faGithub}}" if repo else title
             tech = ", ".join([self.escape_latex(t) for t in (proj.technologies or [])])
-            dates = self.escape_latex(proj.end_date or proj.start_date or "May 2026")
+            dates = self.escape_latex(proj.end_date or proj.start_date or "")
             
             bullets = []
             for bp in (proj.bullet_points or []):
@@ -215,6 +239,8 @@ class LaTeXResumeAgent:
 \\section*{{Involvement}}
 {chr(10).join(inv_lines)}
 """ if inv_lines else ""
+
+        location_block = f"  {{\\footnotesize {location}}}\n  \\\\[1pt]\n" if location else ""
 
         latex_template = f"""% ============================================================
 % ATS-FRIENDLY LATEX RESUME
@@ -335,15 +361,14 @@ class LaTeXResumeAgent:
 \\begin{{center}}
   {{\\fontsize{{22}}{{22}}\\selectfont \\textbf{{{full_name}}}}}
   \\\\[1pt]
-  {{\\footnotesize {location}}}
-  \\\\[1pt]
-  {{\\scriptsize
+{location_block}  {{\\scriptsize
 {contact_line}
   }}
 \\end{{center}}
 \\vspace{{-9pt}}
 
 {edu_section}
+{exp_section}
 {proj_section}
 {skills_section}
 {coursework_section}

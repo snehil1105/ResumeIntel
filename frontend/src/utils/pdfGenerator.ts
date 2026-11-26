@@ -113,10 +113,13 @@ function buildResumePdfDoc(resume: MasterResume, scale: number): jsPDF {
   doc.text(fullName, pageWidth / 2, y, { align: 'center' });
   y += 13 * scale;
 
-  // 2. Location (Single-line guard: strip candidate name if leaked)
+  // 2. Location (Single-line guard: strip candidate name or leaked education keywords)
   let rawLoc = sanitizePdfText(pInfo.location || '');
   if (rawLoc.toLowerCase().includes(fullName.toLowerCase())) {
     rawLoc = rawLoc.replace(new RegExp(fullName, 'i'), '').trim();
+  }
+  if (/university|institute|college|school|education/i.test(rawLoc)) {
+    rawLoc = '';
   }
   if (rawLoc) {
     doc.setFont('times', 'normal');
@@ -352,7 +355,7 @@ export function downloadResumeAsPDF(
   companyName: string = 'Company',
   _jobTitle: string = ''
 ): void {
-  const scales = [1.08, 1.03, 0.98, 0.93, 0.88, 0.83];
+  const scales = [1.20, 1.14, 1.08, 1.02, 0.96, 0.90, 0.85];
   let chosenDoc: jsPDF | null = null;
 
   for (const s of scales) {

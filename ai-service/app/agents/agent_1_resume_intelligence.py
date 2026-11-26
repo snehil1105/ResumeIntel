@@ -71,41 +71,35 @@ class ResumeIntelligenceAgent:
                 full_name = cleaned.title()
                 break
 
-        # Location extraction (single-line only, never spanning into candidate name)
-        location = "Remote / Open to Relocation"
+        # Partition sections first so header location never leaks into Education/other sections
+        sections = self._partition_sections(lines)
+        header_text = "\n".join(sections.get("header", [])[:8])
+
+        # Location extraction (strictly from header lines only, never university/education names)
+        location = ""
         loc_match = re.search(
             r'([A-Za-z][A-Za-z \t]+(?:,[ \t]*[A-Za-z \t]+)+[ \t]*-[ \t]*\d{5,6}|[A-Za-z][A-Za-z \t]+,[ \t]*[A-Za-z]{2}(?:[ \t]+\d{5})?|[A-Za-z][A-Za-z \t]+,[ \t]*(?:USA|India|Canada|UK|Germany|Remote))',
-            body_text
+            header_text
         )
         if loc_match:
             loc_candidate = loc_match.group(0).strip()
-            if len(loc_candidate) < 65 and full_name.lower() not in loc_candidate.lower():
+            if (
+                len(loc_candidate) < 65
+                and full_name.lower() not in loc_candidate.lower()
+                and not any(k in loc_candidate.lower() for k in ["university", "institute", "college", "school", "education"])
+            ):
                 location = loc_candidate
-
-        # Snehil Tripathi specific profile guard (ONLY if this is authentic Snehil resume)
-        if "SNEHIL" in full_name.upper() and "TRIPATHI" in full_name.upper():
-            full_name = "SNEHIL TRIPATHI"
-            location = "Haldwani, Uttarakhand, India - 263139"
-            phone = phone or "+91-7900609557"
-            email = email if email != "candidate@example.com" else "tripatics11@gmail.com"
-            linkedin_url = linkedin_url or "https://linkedin.com/in/snehil-tripathi-38031131a"
-            github_url = github_url or "https://github.com/snehil1105"
-            portfolio_url = portfolio_url or "https://snehil-portfolio-eosin.vercel.app/"
-            leetcode_url = leetcode_url or "https://leetcode.com/u/Snehiltripathi05/"
 
         personal_info = ProtectedPersonalInfo(
             full_name=full_name,
             email=email,
             phone=phone,
-            location=location,
+            location=location or None,
             linkedin_url=linkedin_url,
             github_url=github_url,
             portfolio_url=portfolio_url,
             leetcode_url=leetcode_url
         )
-
-        # 2. Section Partitioning
-        sections = self._partition_sections(lines)
 
         # 3. Educations (Protected)
         educations = self._extract_educations(sections.get("education", []))
@@ -173,23 +167,6 @@ class ResumeIntelligenceAgent:
         # 9. Involvement & Extracurriculars
         inv_raw = sections.get("involvement", []) or sections.get("achievements", [])
         involvements = self._join_wrapped_items(inv_raw)
-
-        # Guard for authentic Snehil resume only
-        if "SNEHIL" in full_name.upper() and "TRIPATHI" in full_name.upper():
-            if not coursework or len(coursework) < 3:
-                coursework = [
-                    "Internet of Things (IoT): IIT Kharagpur / NPTEL",
-                    "Agentic AI Certified Foundations Associate: Oracle University",
-                    "IBM AI Engineering Professional Certificate: Coursera",
-                    "Cloud Computing: IIT Kharagpur / NPTEL",
-                    "Marketing Analysis: IIT Kharagpur / NPTEL",
-                    "Academic Coursework: Data Structures and Algorithms, Object-Oriented Programming, Algorithms Analysis, Computer Networks, Operating Systems, Artificial Intelligence, Computer Architecture, Database Management Systems"
-                ]
-            if not involvements or len(involvements) < 2:
-                involvements = [
-                    "Hackathon Participant: Developed a browser-based game during VibeCode Arena, a competitive hackathon hosted on HackerEarth, demonstrating rapid development and problem-solving under time constraints.",
-                    "Competitive Programming & DSA: Regularly solve algorithmic problems on LeetCode and Codeforces, strengthening problem-solving skills in data structures, algorithms, and optimization."
-                ]
 
         certifications = coursework[:5]
         achievements = involvements[:5]
@@ -480,13 +457,11 @@ class ResumeIntelligenceAgent:
                     cur_bullets.append(clean_b)
                 continue
 
-            # Continuation of previous bullet:
-            # If we are already accumulating bullets, and the current line:
-            # - Starts with a lowercase letter, OR
-            # - Does NOT contain a pipe '|', OR
-            # - Is longer than 80 chars, OR
-            # - Ends with punctuation continuation
-            if cur_bullets and (trimmed[0].islower() or '|' not in trimmed or len(trimmed) > 85):
+            # Explicit project header with pipe '|' (e.g. "Webate: Tech Enthusiast Debate Platform | WebRTC, React ... Dec 2023")
+            is_pipe_header = ('|' in trimmed and trimmed[0].isupper())
+
+            # Continuation of previous bullet (only when NOT an explicit pipe project header)
+            if cur_bullets and not is_pipe_header and (trimmed[0].islower() or len(trimmed) > 85):
                 cur_bullets[-1] = cur_bullets[-1] + " " + trimmed
                 continue
 
@@ -497,27 +472,26 @@ class ResumeIntelligenceAgent:
                 continue
 
             # Project Header line (e.g. "HookRelay | Java, Spring Boot ... June 2026")
-            if '|' in trimmed or len(trimmed) < 80:
-                parts = [p.strip() for p in re.split(r'[|]', trimmed) if p.strip()]
+            if is_pipe_header or len(trimmed) < 80:
+                # Extract and strip trailing date BEFORE splitting on '|' so dates never leak into tech stack
+                d_m = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$', trimmed, re.I)
+                header_date = d_m.group(1).strip() if d_m else ""
+                header_body = trimmed[:d_m.start()].strip(' –|-') if d_m else trimmed
+
+                parts = [p.strip() for p in re.split(r'[|]', header_body) if p.strip()]
                 if not parts:
                     continue
                 first = parts[0]
                 rest = parts[1:] if len(parts) > 1 else []
 
-                # Date in header check
-                d_m = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*)?(?:(?:19|20)\d{2}|Present|Current|Ongoing))?)\s*$', trimmed, re.I)
-                header_date = d_m.group(1).strip() if d_m else ""
-
                 is_first_date = bool(date_regex.match(first))
                 if is_first_date and len(first) < 30:
                     header_date = first
                     header_title = ""
-                    header_techs = [t.strip() for p in rest for t in p.split(',') if t.strip()]
+                    header_techs = [t.strip(' ,;') for p in rest for t in p.split(',') if t.strip(' ,;')]
                 else:
-                    header_title = first
-                    if header_date:
-                        header_title = header_title.replace(header_date, '').strip(' –|-')
-                    header_techs = [t.strip() for p in rest for t in p.split(',') if t.strip()]
+                    header_title = first.strip(' –|-')
+                    header_techs = [t.strip(' ,;') for p in rest for t in p.split(',') if t.strip(' ,;')]
 
                 # Save previous project if exists
                 if cur_title or cur_bullets:
