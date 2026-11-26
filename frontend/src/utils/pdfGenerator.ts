@@ -326,10 +326,15 @@ function buildResumePdfDoc(resume: MasterResume, scale: number): jsPDF {
     });
   }
 
-  // 9. Involvement & Extracurriculars
-  const involvements = ((resume.involvements && resume.involvements.length > 0)
-    ? resume.involvements
-    : (resume.achievements || [])).filter(inv => !isLeakedMeta(inv));
+  // 9. Achievements (separate section when present)
+  const achievementsList = (resume.achievements || []).filter(a => !isLeakedMeta(a));
+  if (achievementsList.length > 0) {
+    drawSectionHeader('Achievements');
+    achievementsList.forEach(a => drawBulletLine(a));
+  }
+
+  // 10. Involvement & Extracurriculars
+  const involvements = (resume.involvements || []).filter(inv => !isLeakedMeta(inv));
 
   if (involvements.length > 0) {
     drawSectionHeader('Involvement');

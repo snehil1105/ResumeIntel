@@ -219,8 +219,20 @@ class LaTeXResumeAgent:
 {chr(10).join(cw_lines)}
 """ if cw_lines else ""
 
-        # 5. INVOLVEMENT (FIFTH)
-        involvements = getattr(resume, 'involvements', None) or resume.achievements or []
+        # 5. ACHIEVEMENTS (SEPARATE SECTION WHEN PRESENT)
+        achievements_list = getattr(resume, 'achievements', None) or []
+        ach_items = [f"\\resumeItem{{\n{self.escape_latex(a)}\n}}" for a in achievements_list]
+        achievements_section = f"""% ============================================================
+% ACHIEVEMENTS
+% ============================================================
+\\section*{{Achievements}}
+\\resumeItemListStart
+{chr(10).join(ach_items)}
+\\resumeItemListEnd
+""" if ach_items else ""
+
+        # 6. INVOLVEMENT / EXTRACURRICULAR
+        involvements = getattr(resume, 'involvements', None) or []
         inv_lines = []
         for inv in involvements:
             parts = inv.split(':')
@@ -234,7 +246,7 @@ class LaTeXResumeAgent:
 {{}}""")
 
         involvement_section = f"""% ============================================================
-% INVOLVEMENT / ACHIEVEMENTS
+% INVOLVEMENT
 % ============================================================
 \\section*{{Involvement}}
 {chr(10).join(inv_lines)}
@@ -372,6 +384,7 @@ class LaTeXResumeAgent:
 {proj_section}
 {skills_section}
 {coursework_section}
+{achievements_section}
 {involvement_section}
 
 % ============================================================

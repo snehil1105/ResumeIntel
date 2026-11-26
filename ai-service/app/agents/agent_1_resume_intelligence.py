@@ -163,15 +163,18 @@ class ResumeIntelligenceAgent:
         headline = f"Software Engineer | {skills[0].skill_name if skills else 'Full Stack'}"
 
         # 8. Coursework & Certifications
-        cw_raw = sections.get("coursework", []) or sections.get("certifications", [])
+        cw_raw = sections.get("coursework", []) + sections.get("certifications", [])
         coursework = self._join_wrapped_items(cw_raw)
 
-        # 9. Involvement & Extracurriculars
-        inv_raw = sections.get("involvement", []) or sections.get("achievements", [])
+        # 9. Achievements (kept strictly separate from Involvement/Extracurriculars)
+        ach_raw = sections.get("achievements", [])
+        achievements = self._join_wrapped_items(ach_raw)
+
+        # 10. Involvement & Extracurriculars
+        inv_raw = sections.get("involvement", [])
         involvements = self._join_wrapped_items(inv_raw)
 
         certifications = coursework[:5]
-        achievements = involvements[:5]
 
         return MasterResume(
             user_id=user_id,
@@ -250,7 +253,8 @@ class ResumeIntelligenceAgent:
     {"category": "Languages", "skill_name": "Python"}
   ],
   "coursework": ["Label: description (empty list if resume has no Coursework/Certifications section)"],
-  "involvements": ["Label: description (empty list if resume has no Involvement/Achievements section)"]
+  "achievements": ["Achievement bullet (empty list if resume has no Achievements/Awards section)"],
+  "involvements": ["Label: description (empty list if resume has no Involvement/Extracurricular section)"]
 }"""
 
         parse_prompt = f"""Parse the following resume text and extracted hyperlinks into clean, 100% factual structured JSON.
@@ -259,7 +263,7 @@ CRITICAL RULES:
 2. Keep `technologies` clean (no dates, no empty strings, no leading commas).
 3. Strip PDF icon artifacts (like trailing `W` or `§`) from project titles and involvement labels.
 4. `location` must ONLY be the candidate's city/state/country (never a university/college name).
-5. Only include `coursework` or `involvements` if the resume actually has those sections. Never invent or copy data not in the text.
+5. Only include `coursework`, `achievements`, or `involvements` if the resume actually has those sections. Keep `achievements` and `involvements` strictly separate. Never invent or copy data not in the text.
 6. Match extracted GitHub repository URLs to their corresponding projects in `repo_url`.
 
 Resume Text & Extracted Hyperlinks:
@@ -386,6 +390,7 @@ Parsed JSON to Verify:
             ] or baseline.skills
 
             cw = [c.strip() for c in (parsed_json.get("coursework") or []) if c and c.strip()]
+            ach = [a.strip() for a in (parsed_json.get("achievements") or []) if a and a.strip()]
             inv = [iv.strip() for iv in (parsed_json.get("involvements") or []) if iv and iv.strip()]
 
             return MasterResume(
@@ -398,7 +403,7 @@ Parsed JSON to Verify:
                 projects=projs,
                 skills=skills,
                 certifications=cw[:5],
-                achievements=inv[:5],
+                achievements=ach,
                 coursework=cw,
                 involvements=inv,
                 raw_text=raw_text,
@@ -454,15 +459,15 @@ Parsed JSON to Verify:
         cur_end = None
         cur_gpa = None
 
-        edu_inst_keywords = ["university", "college", "institute", "school", "academy", "polytechnic", "vidyalaya"]
+        edu_inst_keywords = ["university", "college", "institute", "school", "academy", "polytechnic", "vidyalaya", "vidyabhavan", "bhavan", "convent"]
 
         def save_current():
             nonlocal cur_inst, cur_deg, cur_field, cur_start, cur_end, cur_gpa
             if not cur_inst:
                 return
-            is_school = any(s in cur_inst.lower() for s in ["school", "vidyalaya", "high school", "convent"])
-            deg = cur_deg or ("Secondary Education" if is_school else "Bachelor of Science")
-            field = cur_field if cur_field else ("" if (is_school or " in " in deg.lower()) else "Computer Science & Engineering")
+            is_school = any(s in cur_inst.lower() for s in ["school", "vidyalaya", "vidyabhavan", "bhavan", "high school", "convent"])
+            deg = cur_deg or ("Secondary Education" if is_school else "Bachelor's Degree")
+            field = cur_field or ""
             
             # Deduplicate
             exists = any(e.institution_name.lower() == cur_inst.lower() and e.degree.lower() == deg.lower() for e in educations)

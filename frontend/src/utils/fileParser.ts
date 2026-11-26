@@ -226,7 +226,8 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     projects: ['projects', 'personal projects', 'technical projects', 'academic projects', 'key projects'],
     skills: ['technical skills', 'skills', 'technologies', 'core competencies', 'skills & tools'],
     coursework: ['coursework & certifications', 'coursework and certifications', 'certifications & coursework', 'coursework', 'certifications'],
-    involvement: ['involvement', 'extracurricular', 'extracurriculars', 'activities', 'leadership', 'involvement & extracurriculars', 'achievements']
+    achievements: ['achievements', 'awards', 'honors', 'accomplishments'],
+    involvement: ['involvement', 'extracurricular', 'extracurriculars', 'activities', 'leadership', 'involvement & extracurriculars']
   };
 
   const sectionBuckets: Record<string, string[]> = {
@@ -236,6 +237,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     projects: [],
     skills: [],
     coursework: [],
+    achievements: [],
     involvement: []
   };
 
@@ -280,9 +282,9 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
 
   const saveCurrentEdu = () => {
     if (!curInst) return;
-    const isSchool = /school|vidyalaya|high school|convent/i.test(curInst);
-    const deg = curDeg || (isSchool ? 'Secondary Education' : 'Bachelor of Science in Technical Field');
-    const field = isSchool ? '' : 'Computer Science & Engineering';
+    const isSchool = /school|vidyalaya|vidyabhavan|bhavan|high school|convent/i.test(curInst);
+    const deg = curDeg || (isSchool ? 'Secondary Education' : "Bachelor's Degree");
+    const field = '';
 
     const dateParts = curDates ? curDates.split(/[-–—]|\bto\b/).map(p => p.trim()).filter(Boolean) : [];
     const exists = educations.some(e => e.institution_name.toLowerCase() === curInst.toLowerCase() && e.degree.toLowerCase() === deg.toLowerCase());
@@ -301,7 +303,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
   };
 
   for (const line of eduLines) {
-    const hasInst = /university|college|institute|school|academy/i.test(line) && line.length < 90;
+    const hasInst = /university|college|institute|school|academy|vidyabhavan|vidyalaya|bhavan|convent/i.test(line) && line.length < 90;
     const hasDeg = /b\.tech|bachelor|master|m\.tech|b\.s|intermediate|matriculation|12th|10th|secondary/i.test(line);
 
     const dMatch = line.match(/\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}(?:\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*(?:19|20)\d{2}|Present|Current))?)\b/i);
@@ -486,7 +488,11 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     .map(l => l.replace(/^[•\-\*]\s*/, '').trim())
     .filter(l => l.length > 5);
 
-  // 11. Involvement & Extracurriculars
+  // 11. Achievements & Involvement
+  const achievements = sectionBuckets.achievements
+    .map(l => l.replace(/^[•\-\*]\s*/, '').trim())
+    .filter(l => l.length > 5);
+
   const involvements = sectionBuckets.involvement
     .map(l => l.replace(/^[•\-\*]\s*/, '').trim())
     .filter(l => l.length > 5);
@@ -520,6 +526,7 @@ export function parseRawResumeToStructured(rawText: string): MasterResume {
     projects: projects,
     skills: skills,
     coursework: coursework,
+    achievements: achievements,
     involvements: involvements,
     section_order: ['education', 'projects', 'skills', 'coursework', 'involvement'],
     version_number: 1,
